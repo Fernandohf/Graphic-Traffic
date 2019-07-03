@@ -3,3 +3,5 @@
 *.tar
 *.jpg
 *.pkl
+WhaleID_Verification.ipynb
+.ipynb_checkpoints/WhaleID_Verification-checkpoint.ipynb
