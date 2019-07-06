@@ -1,6 +1,3 @@
-*.tgz
-*.mat
-*.tar
-*.pkl
-WhaleID_Verification.ipynb
-.ipynb_checkpoints/WhaleID_Verification-checkpoint.ipynb
+/data/pascal_voc/
+/data/cars_dataset/
+!/data/**/README.md
