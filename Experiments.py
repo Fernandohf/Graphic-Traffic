@@ -80,7 +80,6 @@ class YoloLayer(nn.Module):
         self.anchors = anchors
     
     def forward(self, x):
-        out = x
         out_xy = torch.sigmoid(x[..., 0:2])  # xy
         # wh for each anchor
         out_wh = torch.stack([torch.exp(x[..., i, 2:4]) * torch.tensor(a) for i, a in enumerate(self.anchors)],
