@@ -226,8 +226,12 @@ class VOCDetectionCustom(Dataset):
                                    self.images[idx] + '.xml')
         img = Image.open(img_path).convert('RGB')
         # TODO - FILTER CLASSES
-        target = xml.etree.ElementTree.parse(target_path)
-
+        xml_doc = xml.etree.ElementTree.parse(target_path)
+        root = xml_doc.getroot()
+        target = {}
+        target['image'] = {'name': self.images[idx],
+                           'heigth': root}
+        xml_target.
         # Transforms
         if self.transform:
             img = self.transform(img)
