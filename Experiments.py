@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
+import xml
 from PIL import Image
 from matplotlib.patches import Rectangle, Circle
 from tqdm import tqdm_notebook
@@ -25,7 +26,7 @@ from torchvision.datasets import CocoDetection, VOCDetection
 
 
 # # Model Architecture
-# 
+#
 # - 2 Anchors
 # - 4 Classes
 
@@ -46,7 +47,7 @@ class BoundingBox():
         """
     @staticmethod
     def _intersection(bb1, b12):
-        return 
+        return
 
 
 class YoloV3Loss(nn.Module):
@@ -62,10 +63,10 @@ class YoloV3Loss(nn.Module):
         self.CE = nn.CrossEntropyLoss()
 
     def forward(self, pred, target):
-        xy_loss = self.lambda_coord * self.MSE(pred[..., 0:2], target[..., 0:2])  # xy loss 
-        wh_loss = self.lambda_coord * self.MSE(pred[..., 2:4], target[..., 2:4])  # wh yolo loss 
-        cls_loss = self.lambda_noobj * self.CE(pred[..., 5:], target[..., 5:])    # class conf loss 
-        obj_loss = self.lambda_noobj * self.BCE(pred[..., 4], target[..., 4])     # obj conf loss 
+        xy_loss = self.lambda_coord * self.MSE(pred[..., 0:2], target[..., 0:2])  # xy loss
+        wh_loss = self.lambda_coord * self.MSE(pred[..., 2:4], target[..., 2:4])  # wh yolo loss
+        cls_loss = self.lambda_noobj * self.CE(pred[..., 5:], target[..., 5:])    # class conf loss
+        obj_loss = self.lambda_noobj * self.BCE(pred[..., 4], target[..., 4])     # obj conf loss
 
         return xy_loss + wh_loss + cls_loss + obj_loss
 
@@ -73,12 +74,12 @@ class YoloV3Loss(nn.Module):
 class YoloLayer(nn.Module):
     """
     Network defining class.
-    
+
     """
     def __init__(self, anchors=((10., 13.), (33., 23.))):
         super().__init__()
         self.anchors = anchors
-    
+
     def forward(self, x):
         out_xy = torch.sigmoid(x[..., 0:2])  # xy
         # wh for each anchor
@@ -122,15 +123,15 @@ class TinyYOLO(nn.Module):
                                 nn.MaxPool2d(2, 2))
         self.C6 = nn.Sequential(nn.Conv2d(256, 256, 1),  # sees 14x14x256 tensor
                                 nn.LeakyReLU())
-        self.C7 = nn.Sequential(nn.Conv2d(256, 128, 1),  
+        self.C7 = nn.Sequential(nn.Conv2d(256, 128, 1),
                                 nn.LeakyReLU())
-        self.C8 = nn.Sequential(nn.Conv2d(128, 9 * n_anchors, 1),  
+        self.C8 = nn.Sequential(nn.Conv2d(128, 9 * n_anchors, 1),
                                 nn.LeakyReLU())
-        
+
         self.network = nn.Sequential(self.C1, self.C2, self.C3, self.C4,
                                       self.C5, self.C7, self.C8)
         self.yolo_layer = YoloLayer()
-        
+
     def forward(self, x):
         """
         Forward pass in the network.
@@ -138,19 +139,106 @@ class TinyYOLO(nn.Module):
         # Sequence of Conv2D + Maxpool
         x = self.network(x)
         x = x.permute(0, 2, 3, 1)
-        bs, i, j, sout = x.shape 
+        bs, i, j, sout = x.shape
         x = x.view(bs, i, j, self.n_anchors, sout//self.n_anchors)
         out = self.yolo_layer(x)
         return out
 
 # TEST
-model = TinyYOLO()
-model
+    # model = TinyYOLO()
+    # model
 
 
-print(torch.softmax(torch.tensor([2,3,4,5.]),-1))
+    # print(torch.softmax(torch.tensor([2,3,4,5.]),-1))
 
 
-inp = torch.ones((1,3, 448, 448))
-model(inp)
+class VOCDetectionCustom(Dataset):
+    """
+    Creates the VOC 2012 Dataset with only certain classes and ready for YOLO format.
+    """
+    YEAR = 'VOC2012'
+    CLASSES = ['person', 'bird', 'cat', 'cow', 'dog', 'horse',
+               'sheep', 'aeroplane', 'bicycle', 'boat', 'bus',
+               'car', 'motorbike', 'train', 'bottle', 'chair',
+               'diningtable', 'pottedplant', 'sofa', 'tvmonitor']
 
+    def __init__(self, root_dir, transform=None, target_transform=None,
+                 classes='all', image_set='train'):
+        """
+        Args:
+            root_dir: Root directory of the images.
+            transform: Tranformation applied to the images.
+            target_transform: Tranformation applied to the target dict.
+            classes: Classes used in this dataset, a list of classes names.
+                    'all': all classes are used.
+            image_set: 'train', 'val' or 'trainval'.
+
+        Return:
+            (image,taret): Tuple with the image and target.s
+        """
+        # Attributes
+        self.root_dir = root_dir
+        self.image_set = image_set
+        self.transform = transform
+        self.target_transform = target_transform
+        if classes == 'all':
+            self.classes = self.CLASSES
+        else:
+            self.classes = classes
+
+        # Load images
+        self.images = self._get_images_list()
+
+    def _get_images_list(self,):
+        """
+        List of images present in the classes used.
+        """
+        main_path = ['VOCdevkit', 'VOC2012', 'ImageSets', 'Main']
+        main_dir = os.path.join(self.root_dir, *main_path)
+        # For each class
+        images = []
+        for c in self.classes:
+            file_path = os.path.join(main_dir, c + '_' + self.image_set +
+                                     '.txt')
+            with open(file_path) as f:
+                files = f.readlines()
+                imgs = [line.split(' ')[0] for line in files if line[-3] != '-']
+            images += imgs
+        return list(set(images))
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+
+        if type(idx) == torch.Tensor:
+            idx = idx.item()
+        # Load images
+        img_path = os.path.join(self.root_dir,
+                                'VOCdevkit',
+                                'VOC2012',
+                                'JPEGImages',
+                                self.images[idx] + '.jpg')
+        target_path = os.path.join(self.root_dir,
+                                   'VOCdevkit',
+                                   'VOC2012',
+                                   'Annotations',
+                                   self.images[idx] + '.xml')
+        img = Image.open(img_path).convert('RGB')
+        # TODO - FILTER CLASSES
+        target = xml.etree.ElementTree.parse(target_path)
+
+        # Transforms
+        if self.transform:
+            img = self.transform(img)
+        if self.target_transform:
+            target = self.target_transform(target)
+
+        # Output
+        return (img, target)
+
+
+ds = VOCDetectionCustom('data/pascal_voc/')
+ds_it = iter(ds)
+img, target = next(ds_it)
+print('a')
