@@ -185,6 +185,7 @@ class VOCDetectionCustom(Dataset):
             self.classes = self.CLASSES
         else:
             self.classes = classes
+            self.classes_id = list(range(len(classes)))
 
         # Load images
         self.images = self._get_images_list()
@@ -225,14 +226,24 @@ class VOCDetectionCustom(Dataset):
                                    'Annotations',
                                    self.images[idx] + '.xml')
         img = Image.open(img_path).convert('RGB')
-        # TODO - FILTER CLASSES
+        # Get data as dict
         xml_doc = xml.etree.ElementTree.parse(target_path)
         root = xml_doc.getroot()
         target = {}
-        target['image'] = {'name': self.images[idx],
-                           'heigth': root}
-        xml_target.
-        # Transforms
+        target['image'] = {'name': root.find('filename').text,
+                           'width': root.find('size')[0].text,
+                           'heigth': root.find('size')[1].text},
+        objects = []
+        for obj in root.findall('object'):
+            name = obj.find('name').text
+            if name in self.classes:
+                objects.append({'class': name,
+                                'xmin': obj.find('bndbox')[0].text,
+                                'ymin': obj.find('bndbox')[1].text,
+                                'xmax': obj.find('bndbox')[2].text,
+                                'ymax': obj.find('bndbox')[3].text})
+        target['objects'] = objects
+# Transforms
         if self.transform:
             img = self.transform(img)
         if self.target_transform:
@@ -241,8 +252,8 @@ class VOCDetectionCustom(Dataset):
         # Output
         return (img, target)
 
-
-ds = VOCDetectionCustom('data/pascal_voc/')
+cls_test = ['bicycle', 'bus', 'car', 'motorbike']
+ds = VOCDetectionCustom('data/pascal_voc/', classes=cls_test)
 ds_it = iter(ds)
 img, target = next(ds_it)
 print('a')
