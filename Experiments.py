@@ -185,7 +185,7 @@ class VOCDetectionCustom(Dataset):
             self.classes = self.CLASSES
         else:
             self.classes = classes
-            self.classes_id = list(range(len(classes)))
+            self.classes_id = {cls:i for i, cls in enumerate(classes)}
 
         # Load images
         self.images = self._get_images_list()
@@ -232,18 +232,20 @@ class VOCDetectionCustom(Dataset):
         target = {}
         target['image'] = {'name': root.find('filename').text,
                            'width': root.find('size')[0].text,
-                           'heigth': root.find('size')[1].text},
+                           'heigth': root.find('size')[1].text}
+
         objects = []
         for obj in root.findall('object'):
             name = obj.find('name').text
             if name in self.classes:
                 objects.append({'class': name,
-                                'xmin': obj.find('bndbox')[0].text,
-                                'ymin': obj.find('bndbox')[1].text,
-                                'xmax': obj.find('bndbox')[2].text,
-                                'ymax': obj.find('bndbox')[3].text})
+                                'class_id': self.classes_id[name],
+                                'xmin': int(obj.find('bndbox')[0].text),
+                                'ymin': int(obj.find('bndbox')[1].text),
+                                'xmax': int(obj.find('bndbox')[2].text),
+                                'ymax': int(obj.find('bndbox')[3].text)})
         target['objects'] = objects
-# Transforms
+        # Transforms
         if self.transform:
             img = self.transform(img)
         if self.target_transform:
@@ -252,8 +254,143 @@ class VOCDetectionCustom(Dataset):
         # Output
         return (img, target)
 
+# Image Transforms
+IMG_SIZE = (448, 448)
+img_transform = T.Compose([T.Resize(IMG_SIZE),
+                           T.ToTensor()])
+
+# Target transform
+GRID = 14
+IMG_SIZE = (448, 448)
+
+# Target vectors
+
+
+def target_transform(target, img_size=IMG_SIZE):
+    """
+    y = [b_x, b_y, b_w, b_h, prob, cls]
+    cls = (bicycle, bus, car, motorbike)
+    """
+    print(target)
+    img_w0, img_h0 = int(target['image']['width']), int(target['image']['heigth'])
+    img_w, img_h = img_size
+    # Ratio
+    w_ratio = img_w / img_w0
+    h_ratio = img_h / img_h0
+    for obj in target['objects']:
+        grid_h, grid_w = (img_h // GRID, img_w // GRID)
+        # Bounding box data
+        xmin, ymin, xmax, ymax = obj['xmin'], obj['ymin'], obj['xmax'], obj['ymax']
+        # Center of annotation
+        mid_x, mid_y = ((xmin + (xmax - xmin) / 2) * w_ratio,
+                        (ymin +(ymax - ymin) / 2) * h_ratio)
+        # Target
+        target = np.zeros((GRID, GRID, 6))
+        n_grid_x = int(mid_x // grid_w)
+        n_grid_y = int(mid_y // grid_h)
+        target[n_grid_x, n_grid_y, 0] = (mid_x - n_grid_x * grid_w) / grid_w
+        target[n_grid_x, n_grid_y, 1] = (mid_y - n_grid_y * grid_h) / grid_h
+        target[n_grid_x, n_grid_y, 2] = (xmax - xmin) * w_ratio / grid_w
+        target[n_grid_x, n_grid_y, 3] = (ymax - ymin) * h_ratio / grid_h
+        target[n_grid_x, n_grid_y, 4] = 1
+        target[n_grid_x, n_grid_y, 5] = obj['class_id']
+
+    return target
+
+    # Target transform
+GRID = 14
+IMG_SIZE = (448, 448)
+# Target vectors
+
+
+def target_transform(target, img_size=IMG_SIZE):
+    """
+    y = [b_x, b_y, b_w, b_h, prob, cls]
+    cls = (bicycle, bus, car, motorbike)
+    """
+    img_w0, img_h0 = int(target['image']['width']), int(target['image']['heigth'])
+    img_w, img_h = img_size
+    # Ratio
+    w_ratio = img_w / img_w0
+    h_ratio = img_h / img_h0
+    for obj in target['objects']:
+        grid_h, grid_w = (img_h // GRID, img_w // GRID)
+        # Bounding box data
+        xmin, ymin, xmax, ymax = (obj['xmin'], obj['ymin'],
+                                  obj['xmax'], obj['ymax'])
+        # Center of annotation
+        mid_x, mid_y = ((xmin + (xmax - xmin) / 2) * w_ratio,
+                        (ymin + (ymax - ymin) / 2) * h_ratio)
+        # Target
+        target = np.zeros((GRID, GRID, 6))
+        n_grid_x = int(mid_x // grid_w)
+        n_grid_y = int(mid_y // grid_h)
+        target[n_grid_x, n_grid_y, 0] = (mid_x - n_grid_x * grid_w) / grid_w
+        target[n_grid_x, n_grid_y, 1] = (mid_y - n_grid_y * grid_h) / grid_h
+        target[n_grid_x, n_grid_y, 2] = (xmax - xmin) * w_ratio / grid_w
+        target[n_grid_x, n_grid_y, 3] = (ymax - ymin) * h_ratio / grid_h
+        target[n_grid_x, n_grid_y, 4] = 1
+        target[n_grid_x, n_grid_y, 5] = obj['class_id']
+
+    return target
+
+# Test Data set
 cls_test = ['bicycle', 'bus', 'car', 'motorbike']
-ds = VOCDetectionCustom('data/pascal_voc/', classes=cls_test)
+ds = VOCDetectionCustom('data/pascal_voc/', classes=cls_test, transform=img_transform,
+                        target_transform=target_transform)
 ds_it = iter(ds)
 img, target = next(ds_it)
-print('a')
+print(target.shape)
+print(img.shape)
+
+def show_image(img, ax=None):
+    """
+    Show Image in the path variable.
+    """
+    if isinstance(img, str):
+        image = Image.open(img)
+    else:
+        image = img
+    if ax is None:
+        f = plt.figure(figsize=(12,10))
+        ax = f.add_subplot(1, 1, 1, xticks=[], yticks=[])
+    ax.imshow(image)
+    return ax
+
+# Check transforms
+def show_tensors_data(img, target):
+    img = T.ToPILImage()(img)
+    img_data = np.array(img)
+
+    img_h, img_w = img_data.shape[1:]
+    grid_h, grid_w = target.shape[:2]
+    ax = show_image(img)
+
+    for i in range(GRID):
+        for j in range(GRID):
+            rel_x = i * grid_w
+            rel_y = j * grid_h
+            rect = Rectangle((rel_x, rel_y), grid_w, grid_h, linewidth=1,
+                             edgecolor='b', facecolor='none')
+            if target[i, j, 0] == 1:
+                delta_x, delta_y = target[i, j, 3:5]
+                x, y = target[i, j, 1:3]
+                x, y = int(rel_x + x * grid_w), int(rel_y + y * grid_h)
+                bound_rect = Rectangle((int(x - delta_x / 2 * grid_w),
+                                        int(y - delta_y/2 * grid_h)),
+                                       int(delta_x * grid_w),
+                                       int(delta_y * grid_h),
+                                       linewidth=6, edgecolor='r', facecolor='none')
+
+                mid_circ = Circle((x, y), 5, linewidth=3, edgecolor='b',
+                                  facecolor='k')
+                rect.set_edgecolor('r')
+                rect.set_linewidth(4)
+                ax.add_patch(bound_rect)
+                ax.add_patch(mid_circ)
+
+            ax.add_patch(rect)
+
+    return ax
+
+show_tensors_data(img, target)
