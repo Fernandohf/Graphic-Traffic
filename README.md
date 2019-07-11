@@ -1,4 +1,4 @@
-# Graphic-Traffic
+# ![](https://github.com/Fernandohf/Graphic-Traffic/blob/master/icon.png) Graphic-Traffic
 
 Program to monitor traffic from camera input.
 
