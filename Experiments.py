@@ -263,6 +263,7 @@ img_transform = T.Compose([T.Resize(IMG_SIZE),
 GRID = 14
 IMG_SIZE = (448, 448)
 
+
 def target_transform(target, img_size=IMG_SIZE):
     """
     y = [b_x, b_y, b_w, b_h, prob, cls]
