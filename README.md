@@ -1,4 +1,4 @@
-# <img src="https://github.com/Fernandohf/Graphic-Traffic/blob/master/icon.png?raw=true" width="34" href="https://github.com/Fernandohf/Graphic-Traffic"> Graphic-Traffic
+# <a href="https://github.com/Fernandohf/Graphic-Traffic"><img src="https://github.com/Fernandohf/Graphic-Traffic/blob/master/icon.png?raw=true" width="34"></a> Graphic-Traffic
 [![GitHub license](https://img.shields.io/github/license/Fernandohf/Graphic-Traffic.svg)](https://github.com/Fernandohf/Graphic-Traffic/blob/master/LICENSE)
 
 Program to monitor traffic from camera input.
