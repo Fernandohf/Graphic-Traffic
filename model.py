@@ -1,5 +1,5 @@
 """
-Classes to build the model
+Classes to build the model and its loss
 """
 import torch
 from torch import nn
@@ -18,7 +18,9 @@ class YoloLayer(nn.Module):
     - Sigmoid on `x` and `y`
     - Exp on w, h and multiply by anchors dimensions.
     - Sigmoid on `prob`
-    - Softmax on `one_hot_classes`
+
+    OBS.: Softmax on `one_hot_classes` is not used.
+          Because `CrossEntropyLoss` is used.
 
     Args:
         anchors: tuples of tuples of list of lists with the dimensions
@@ -35,9 +37,10 @@ class YoloLayer(nn.Module):
         # wh for each anchor
         out_wh = torch.stack([torch.exp(x[..., i, 2:4]) * torch.tensor(a)
                               for i, a in enumerate(self.anchors)],
-                             dim=3)
+                             dim=-2)
         out_obj = torch.sigmoid(x[..., 4:5])  # obj
-        out_cls = torch.softmax(x[..., 5:], -1)  # classes
+        out_cls = x[..., 5:]  # classes
+        # out_cls = torch.softmax(x[..., 5:], -1)  # classes
         return torch.cat([out_xy, out_wh, out_obj, out_cls], dim=-1)
 
 
@@ -56,38 +59,40 @@ class TinyYOLO(nn.Module):
         self.n_anchors = n_anchors
         self.n_classes = n_classes
         # Sequence of Convolution + Maxpool Layers
-        self.conv_1 = nn.Sequential(nn.Conv2d(3, 16, 3, padding=1),  # 448x448x3
+        self.conv_1 = nn.Sequential(nn.Conv2d(3, 16, 3, padding=1),  # 448x448
                                     nn.LeakyReLU(),
                                     nn.Conv2d(16, 16, 3, padding=1),
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
-        self.conv_2 = nn.Sequential(nn.Conv2d(16, 32, 3, padding=1),  # 224x224x16
+        self.conv_2 = nn.Sequential(nn.Conv2d(16, 32, 3, padding=1),  # 224x224
                                     nn.LeakyReLU(),
                                     nn.Conv2d(32, 32, 3, padding=1),
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
-        self.conv_3 = nn.Sequential(nn.Conv2d(32, 64, 3, padding=1),  # 112x112x32
+        self.conv_3 = nn.Sequential(nn.Conv2d(32, 64, 3, padding=1),  # 112x112
                                     nn.LeakyReLU(),
                                     nn.Conv2d(64, 64, 3, padding=1),
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
-        self.conv_4 = nn.Sequential(nn.Conv2d(64, 128, 3, padding=1),  # 56x56x64
+        self.conv_4 = nn.Sequential(nn.Conv2d(64, 128, 3, padding=1),  # 56x56
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
-        self.conv_5 = nn.Sequential(nn.Conv2d(128, 256, 3, padding=1),  # 28x28x128
+        self.conv_5 = nn.Sequential(nn.Conv2d(128, 256, 3, padding=1),  # 28x28
                                     nn.LeakyReLU(),
                                     nn.Conv2d(256, 256, 3, padding=1),
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
         # 1D Convolutions
-        self.conv_6 = nn.Sequential(nn.Conv2d(256, 256, 1),  # 14x14x256
+        self.conv_6 = nn.Sequential(nn.Conv2d(256, 256, 1),  # 14x14
                                     nn.LeakyReLU())
         self.conv_7 = nn.Sequential(nn.Conv2d(256, 128, 1),
                                     nn.LeakyReLU())
-        self.conv_8 = nn.Sequential(nn.Conv2d(128, (5 + n_classes) * n_anchors, 1),
+        self.conv_8 = nn.Sequential(nn.Conv2d(128,
+                                              (5 + n_classes) * n_anchors, 1),
                                     nn.LeakyReLU())
-        self.network = nn.Sequential(self.conv_1, self.conv_2, self.conv_3, self.conv_4,
-                                     self.conv_5, self.conv_6, self.conv_7, self.conv_8)
+        self.network = nn.Sequential(self.conv_1, self.conv_2, self.conv_3,
+                                     self.conv_4, self.conv_5, self.conv_6,
+                                     self.conv_7, self.conv_8)
         self.yolo_layer = YoloLayer()
 
     def forward(self, x):
@@ -95,10 +100,45 @@ class TinyYOLO(nn.Module):
         Forward pass in the network.
         """
         # Sequence of Conv2D + Maxpool
-        x = self.network(x)
+        x = self.network(x).float()
         # Reorder dimensions
         x = x.permute(0, 2, 3, 1)
         batch_size, i, j, _ = x.shape
         x = x.view(batch_size, i, j, self.n_anchors, -1)
         out = self.yolo_layer(x)
         return out
+
+
+class YoloV3Loss(nn.Module):
+    """
+    Implements the loss described in the YOLO v3 paper, the
+    loss is composed of 4 components:
+    - XY Coordinates Loss: Mean squared error between the bounding
+                           box centers, multiplied by `lambda_coord`.
+    - HW Loss: Mean squared error between the bounding
+               height and width, multiplied by `lambda_coord`.
+    - CLS Loss: Cross entropy loss between possible classes one
+                hot enconded, multiplied by `lambda_noobj`.
+    """
+
+    def __init__(self, lambda_coord=5, lambda_noobj=.5,):
+        super(YoloLoss, self).__init__()
+        self.lambda_coord = lambda_coord
+        self.lambda_noobj = lambda_noobj
+        self.MSE = nn.MSELoss()
+        self.BCE = nn.BCEWithLogitsLoss()
+        self.CE = nn.CrossEntropyLoss()
+
+    def forward(self, pred, target):
+        obj = torch.tensor(target[..., 4], dtype=torch.uint8)
+        noobj = obj.copy()
+        xy_loss = self.lambda_coord * self.MSE(pred[..., 0:2],
+                                               target[..., 0:2])  # xy loss
+        wh_loss = self.lambda_coord * self.MSE(pred[..., 2:4],
+                                               target[..., 2:4])  # wh loss
+        cls_loss = self.lambda_noobj * self.CE(pred[..., 5:],
+                                               target[..., 5])  # cls loss
+        obj_loss = self.lambda_noobj * self.BCE(pred[..., 4],
+                                                target[..., 4])  # obj loss
+
+        return xy_loss + wh_loss + cls_loss + obj_loss
