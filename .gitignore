@@ -1,5 +1,6 @@
 /data/pascal_voc/
 /data/cars_dataset/
 !/data/**/README.md
-/.ipynb_checkpoints/
+**/.ipynb_checkpoints/
 /.vscode/
+*pyc
