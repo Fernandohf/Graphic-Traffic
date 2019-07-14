@@ -1,0 +1,104 @@
+"""
+Classes to build the model
+"""
+import torch
+from torch import nn
+
+# Model
+
+
+class YoloLayer(nn.Module):
+    """
+    Final Layer of YOLO network, assuming input in the format:
+    (BS, GRIDX, GRIDY, N_ANCHORS, 5 + N_CLASSSES)
+    where the last dimension is defined as:
+    [x, y, w, h, prob, [one_hot_classes]]
+
+    Perform the following operations:
+    - Sigmoid on `x` and `y`
+    - Exp on w, h and multiply by anchors dimensions.
+    - Sigmoid on `prob`
+    - Softmax on `one_hot_classes`
+
+    Args:
+        anchors: tuples of tuples of list of lists with the dimensions
+                 of the achors being used. Example:
+                 ((10., 13.), (33., 23.))
+    """
+
+    def __init__(self, anchors=((10., 13.), (33., 23.))):  # anchors yolo
+        super().__init__()
+        self.anchors = anchors
+
+    def forward(self, x):
+        out_xy = torch.sigmoid(x[..., 0:2])  # xy
+        # wh for each anchor
+        out_wh = torch.stack([torch.exp(x[..., i, 2:4]) * torch.tensor(a)
+                              for i, a in enumerate(self.anchors)],
+                             dim=3)
+        out_obj = torch.sigmoid(x[..., 4:5])  # obj
+        out_cls = torch.softmax(x[..., 5:], -1)  # classes
+        return torch.cat([out_xy, out_wh, out_obj, out_cls], dim=-1)
+
+
+class TinyYOLO(nn.Module):
+    """
+    YoloLite inspired class.
+    Network Stride: 32
+
+    Args:
+        n_anchors: Number of anchors being used in the network.
+        n_class: Number of possible classes.
+    """
+
+    def __init__(self, n_anchors=2, n_classes=3):
+        super().__init__()
+        self.n_anchors = n_anchors
+        self.n_classes = n_classes
+        # Sequence of Convolution + Maxpool Layers
+        self.conv_1 = nn.Sequential(nn.Conv2d(3, 16, 3, padding=1),  # 448x448x3
+                                    nn.LeakyReLU(),
+                                    nn.Conv2d(16, 16, 3, padding=1),
+                                    nn.LeakyReLU(),
+                                    nn.MaxPool2d(2, 2))
+        self.conv_2 = nn.Sequential(nn.Conv2d(16, 32, 3, padding=1),  # 224x224x16
+                                    nn.LeakyReLU(),
+                                    nn.Conv2d(32, 32, 3, padding=1),
+                                    nn.LeakyReLU(),
+                                    nn.MaxPool2d(2, 2))
+        self.conv_3 = nn.Sequential(nn.Conv2d(32, 64, 3, padding=1),  # 112x112x32
+                                    nn.LeakyReLU(),
+                                    nn.Conv2d(64, 64, 3, padding=1),
+                                    nn.LeakyReLU(),
+                                    nn.MaxPool2d(2, 2))
+        self.conv_4 = nn.Sequential(nn.Conv2d(64, 128, 3, padding=1),  # 56x56x64
+                                    nn.LeakyReLU(),
+                                    nn.MaxPool2d(2, 2))
+        self.conv_5 = nn.Sequential(nn.Conv2d(128, 256, 3, padding=1),  # 28x28x128
+                                    nn.LeakyReLU(),
+                                    nn.Conv2d(256, 256, 3, padding=1),
+                                    nn.LeakyReLU(),
+                                    nn.MaxPool2d(2, 2))
+        # 1D Convolutions
+        self.conv_6 = nn.Sequential(nn.Conv2d(256, 256, 1),  # 14x14x256
+                                    nn.LeakyReLU())
+        self.conv_7 = nn.Sequential(nn.Conv2d(256, 128, 1),
+                                    nn.LeakyReLU())
+        self.conv_8 = nn.Sequential(nn.Conv2d(128, (5 + n_classes) * n_anchors, 1),
+                                    nn.LeakyReLU())
+        self.network = nn.Sequential(self.conv_1, self.conv_2, self.conv_3, self.conv_4,
+                                     self.conv_5, self.conv_6, self.conv_7, self.conv_8)
+        self.yolo_layer = YoloLayer()
+
+    def forward(self, x):
+        """
+        Forward pass in the network.
+        """
+        # Sequence of Conv2D + Maxpool
+        x = self.network(x)
+        # Reorder dimensions
+        x = x.permute(0, 2, 3, 1)
+        batch_size, i, j, _ = x.shape
+        x = x.view(batch_size, i, j, self.n_anchors, -1)
+        out = self.yolo_layer(x)
+        return out
