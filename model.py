@@ -122,7 +122,7 @@ class YoloV3Loss(nn.Module):
     """
 
     def __init__(self, lambda_coord=5, lambda_noobj=.5,):
-        super(YoloLoss, self).__init__()
+        super(YoloV3Loss, self).__init__()
         self.lambda_coord = lambda_coord
         self.lambda_noobj = lambda_noobj
         self.MSE = nn.MSELoss()
