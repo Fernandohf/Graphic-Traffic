@@ -28,7 +28,7 @@ class YoloLayer(nn.Module):
                  ((10., 13.), (33., 23.))
     """
 
-    def __init__(self, anchors=((10., 13.), (33., 23.))):  # anchors yolo
+    def __init__(self, anchors):  # anchors yolo
         super().__init__()
         self.anchors = anchors
 
@@ -54,9 +54,9 @@ class TinyYOLO(nn.Module):
         n_class: Number of possible classes.
     """
 
-    def __init__(self, n_anchors=2, n_classes=3):
+    def __init__(self, anchors=((10., 13.), (33., 23.)), n_classes=3):
         super().__init__()
-        self.n_anchors = n_anchors
+        self.n_anchors = len(anchors)
         self.n_classes = n_classes
         # Sequence of Convolution + Maxpool Layers
         self.conv_1 = nn.Sequential(nn.Conv2d(3, 16, 3, padding=1),  # 448x448
@@ -88,12 +88,12 @@ class TinyYOLO(nn.Module):
         self.conv_7 = nn.Sequential(nn.Conv2d(256, 128, 1),
                                     nn.LeakyReLU())
         self.conv_8 = nn.Sequential(nn.Conv2d(128,
-                                              (5 + n_classes) * n_anchors, 1),
+                                              (5 + n_classes) * self.n_anchors, 1),
                                     nn.LeakyReLU())
         self.network = nn.Sequential(self.conv_1, self.conv_2, self.conv_3,
                                      self.conv_4, self.conv_5, self.conv_6,
                                      self.conv_7, self.conv_8)
-        self.yolo_layer = YoloLayer()
+        self.yolo_layer = YoloLayer(anchors)
 
     def forward(self, x):
         """
@@ -107,6 +107,8 @@ class TinyYOLO(nn.Module):
         x = x.view(batch_size, i, j, self.n_anchors, -1)
         out = self.yolo_layer(x)
         return out
+
+# TODO - FIX LOSS WITH MASK
 
 
 class YoloV3Loss(nn.Module):
@@ -130,8 +132,8 @@ class YoloV3Loss(nn.Module):
         self.CE = nn.CrossEntropyLoss()
 
     def forward(self, pred, target):
-        obj = torch.tensor(target[..., 4], dtype=torch.uint8)
-        noobj = obj.copy()
+        obj_mask = torch.tensor(target[..., 4], dtype=torch.uint8)
+        noobj_mask = ~obj
         xy_loss = self.lambda_coord * self.MSE(pred[..., 0:2],
                                                target[..., 0:2])  # xy loss
         wh_loss = self.lambda_coord * self.MSE(pred[..., 2:4],
