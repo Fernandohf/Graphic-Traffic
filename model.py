@@ -88,7 +88,8 @@ class TinyYOLO(nn.Module):
         self.conv_7 = nn.Sequential(nn.Conv2d(256, 128, 1),
                                     nn.LeakyReLU())
         self.conv_8 = nn.Sequential(nn.Conv2d(128,
-                                              (5 + n_classes) * self.n_anchors, 1),
+                                              (5 + n_classes) * self.n_anchors,
+                                              1),
                                     nn.LeakyReLU())
         self.network = nn.Sequential(self.conv_1, self.conv_2, self.conv_3,
                                      self.conv_4, self.conv_5, self.conv_6,
@@ -132,6 +133,9 @@ class YoloV3Loss(nn.Module):
     def forward(self, pred, target):
         obj_mask = target[..., 4] == 1
         noobj_mask = ~obj_mask
+        if torch.sum(obj_mask) == 0:
+            raise IndexError(
+                "Image has no class. Check the image or the target volume.")
         # XY Loss
         xy_loss = (self.lambda_coord *
                    (self.MSE(pred[..., 0][obj_mask],
