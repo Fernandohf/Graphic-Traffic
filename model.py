@@ -39,8 +39,8 @@ class YoloLayer(nn.Module):
                               for i, a in enumerate(self.anchors)],
                              dim=-2)
         out_obj = torch.sigmoid(x[..., 4:5])  # obj
-        out_cls = x[..., 5:]  # classes
-        # out_cls = torch.softmax(x[..., 5:], -1)  # classes
+        # out_cls = x[..., 5:]  # classes
+        out_cls = torch.softmax(x[..., 5:], -1)  # classes
         return torch.cat([out_xy, out_wh, out_obj, out_cls], dim=-1)
 
 
