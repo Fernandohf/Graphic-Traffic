@@ -108,8 +108,6 @@ class TinyYOLO(nn.Module):
         out = self.yolo_layer(x)
         return out
 
-# TODO - FIX LOSS WITH MASK
-
 
 class YoloV3Loss(nn.Module):
     """
@@ -128,19 +126,33 @@ class YoloV3Loss(nn.Module):
         self.lambda_coord = lambda_coord
         self.lambda_noobj = lambda_noobj
         self.MSE = nn.MSELoss()
-        self.BCE = nn.BCEWithLogitsLoss()
-        self.CE = nn.CrossEntropyLoss()
+        # self.BCE = nn.BCEWithLogitsLoss()
+        # self.CE = nn.CrossEntropyLoss()
 
     def forward(self, pred, target):
-        obj_mask = torch.tensor(target[..., 4], dtype=torch.uint8)
-        noobj_mask = ~obj
-        xy_loss = self.lambda_coord * self.MSE(pred[..., 0:2],
-                                               target[..., 0:2])  # xy loss
-        wh_loss = self.lambda_coord * self.MSE(pred[..., 2:4],
-                                               target[..., 2:4])  # wh loss
-        cls_loss = self.lambda_noobj * self.CE(pred[..., 5:],
-                                               target[..., 5])  # cls loss
-        obj_loss = self.lambda_noobj * self.BCE(pred[..., 4],
-                                                target[..., 4])  # obj loss
+        obj_mask = target[..., 4] == 1
+        noobj_mask = ~obj_mask
+        # XY Loss
+        xy_loss = (self.lambda_coord *
+                   (self.MSE(pred[..., 0][obj_mask],
+                             target[..., 0][obj_mask]) +
+                    self.MSE(pred[..., 1][obj_mask],
+                             target[..., 1][obj_mask])))
+        # HW Loss
+        wh_loss = (self.lambda_coord *
+                   (self.MSE(torch.sqrt(pred[..., 2][obj_mask]),
+                             torch.sqrt(target[..., 2][obj_mask])) +
+                    self.MSE(torch.sqrt(pred[..., 3][obj_mask]),
+                             torch.sqrt(target[..., 3][obj_mask]))))
+        # Class Loss
+        cls_mask = target[..., 5:] == 1
+        nocls_mask = ~cls_mask
+        cls_loss = (self.MSE(pred[..., 5:][cls_mask],
+                             target[..., 5:][cls_mask]) +
+                    self.lambda_noobj * self.MSE(pred[..., 5:][nocls_mask],
+                                                 target[..., 5:][nocls_mask]))
+        # Object Loss
+        obj_loss = self.MSE(pred[..., 4][obj_mask],
+                            target[..., 4][obj_mask])
 
         return xy_loss + wh_loss + cls_loss + obj_loss
