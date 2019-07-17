@@ -17,7 +17,7 @@ class VOCDetectionCustom(Dataset):
     and target ready for YOLO format.
     """
     YEAR = 'VOC2012'
-    ANCHORS = ((10., 13.), (33., 23.))
+    ANCHORS = ((10., 15.), (33., 23.))
     CLASSES = ['person', 'bird', 'cat', 'cow', 'dog', 'horse',
                'sheep', 'aeroplane', 'bicycle', 'boat', 'bus',
                'car', 'motorbike', 'train', 'bottle', 'chair',
@@ -116,29 +116,55 @@ class VOCDetectionCustom(Dataset):
         # Output
         return (img, target)
 
-    def _calc_iou(self,):
-        # TODO
+    def _get_anchor_index(self, w, h):
+        """
+        Get the anchor index with highest iou in heght and width
+        """
+        ious = []
+        for a in self.ANCHORS:
+            bb1 = [w, h]
+            bb2 = [a]
+            ious.append(self.wh_iou())
+
+    def wh_iou(self, bb1, bb2):
         pass
 
     def default_i_transform(self, img):
         # TODO
         pass
 
-    def default_t_transform(self, target, img_size=IMG_SIZE, grid=GRID):
+    def default_t_transform(self, target, img_size=((448, 448)), stride=32):
         """
-        y = [b_x, b_y, b_w, b_h, prob, cls]
-        cls = (bicycle, bus, car, motorbike)
+        Transform the dictionary into the target volume.
+
+        The volume has shape
+
+            (BS, GRIDX, GRIDY, N_ANCHORS, 5 + N_CLASSSES)
+
+        where the last dimension is defined as:
+
+        [b_x, b_y, b_w, b_h, prob, one_hot_classes]
+
+        Args:
+            target: dictionary with the bouding box info.
+            img_size: size of the input image.
+            target: stride of the network.
+
+        Returns:
+            volume: Tranformed target.
         """
-        img_w0, img_h0 = int(target['image']['width']), int(
-            target['image']['heigth'])
+        img_w0, img_h0 = (int(target['image']['width']),
+                          int(target['image']['heigth']))
         img_w, img_h = img_size
         # Ratio
+        grid = img_w // stride
+        n_classes = len(self.classes)
+        n_anchors = len(self.ANCHORS)
         w_ratio = img_w / img_w0
         h_ratio = img_h / img_h0
 
-        volume = np.zeros((grid, grid, 6))
+        volume = np.zeros((grid, grid, n_anchors, 5 + n_classes))
         for obj in target['objects']:
-            print('aa')
             grid_h, grid_w = (img_h // grid, img_w // grid)
             # Bounding box data
             xmin, ymin, xmax, ymax = (obj['xmin'], obj['ymin'],
@@ -147,16 +173,21 @@ class VOCDetectionCustom(Dataset):
             mid_x, mid_y = ((xmin + (xmax - xmin) / 2) * w_ratio,
                             (ymin + (ymax - ymin) / 2) * h_ratio)
             # Volume
-            n_grid_x = int(mid_x // grid_w)
-            n_grid_y = int(mid_y // grid_h)
-            volume[n_grid_x, n_grid_y, 0] = (
-                mid_x - n_grid_x * grid_w) / grid_w
-            volume[n_grid_x, n_grid_y, 1] = (
-                mid_y - n_grid_y * grid_h) / grid_h
-            volume[n_grid_x, n_grid_y, 2] = (xmax - xmin) * w_ratio / grid_w
-            volume[n_grid_x, n_grid_y, 3] = (ymax - ymin) * h_ratio / grid_h
-            volume[n_grid_x, n_grid_y, 4] = 1
-            volume[n_grid_x, n_grid_y, 5] = obj['class_id']
+            i_grid_x = int(mid_x // grid_w)
+            i_grid_y = int(mid_y // grid_h)
+            vol_x = (mid_x - i_grid_x * grid_w) / grid_w
+            vol_y = (mid_y - i_grid_y * grid_h) / grid_h
+            vol_w = (xmax - xmin) * w_ratio / grid_w
+            vol_h = (ymax - ymin) * h_ratio / grid_h
+            i_anchor = self._get_anchor_index(vol_w, vol_h)
+            vol_cls = [0] * n_classes
+            vol_cls[obj['class_id']] = 1
+            volume[i_grid_x, i_grid_y, i_anchor, 0] = vol_x
+            volume[i_grid_x, i_grid_y, i_anchor, 1] = vol_y
+            volume[i_grid_x, i_grid_y, i_anchor, 2] = vol_w
+            volume[i_grid_x, i_grid_y, i_anchor, 3] = vol_h
+            volume[i_grid_x, i_grid_y, i_anchor, 4] = 1
+            volume[i_grid_x, i_grid_y, i_anchor, 5:] = vol_cls
 
         return volume
 
