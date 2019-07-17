@@ -5,8 +5,10 @@ Classes for the Datasets
 import os
 import xml
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from matplotlib.patches import Rectangle
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as T
@@ -201,9 +203,62 @@ class VOCDetectionCustom(Dataset):
         return volume
 
 
-if __name__ == "__main__":
-    cls_test = ['bicycle', 'bus', 'car', 'motorbike']
-    ds = VOCDetectionCustom(classes=cls_test)
-    iter_ds = iter(ds)
-    img, data = next(iter_ds)
-    prin(32)
+def show_image(img, ax=None):
+    """
+    Show Image in the path variable.
+    """
+    if isinstance(img, str):
+        image = Image.open(img)
+    else:
+        image = img
+    if ax is None:
+        f = plt.figure(figsize=(12, 10))
+        ax = f.add_subplot(1, 1, 1, xticks=[], yticks=[])
+    ax.imshow(image)
+    return ax
+
+
+# Check transforms
+def show_tensors_data(img, target):
+    img = T.ToPILImage()(img)
+    img_data = np.array(img)
+
+    img_h, img_w = img.size
+    grid = target.shape[0]
+    anchors = target.shape[-2]
+    grid_h, grid_w = (img_h // grid, img_w // grid)
+    ax = show_image(img)
+    colors = {0: 'r', 1: 'orange',
+              2: 'g', 3: 'k', }
+    for i in range(grid):
+        for j in range(grid):
+            rel_x = i * grid_w
+            rel_y = j * grid_h
+            rect = Rectangle((rel_x, rel_y), grid_w, grid_h, linewidth=1,
+                             edgecolor='b', facecolor='none')
+            for k in range(anchors):
+                if target[i, j, k, 4] == 1:
+                    dx, dy = target[i, j, k, 2:4]
+                    x, y = target[i, j, k, :2]
+                    x, y = int(rel_x + x * grid_w), int(rel_y + y * grid_h)
+                    idx = target[i, j, k, 5:].argmax()
+                    bound_rect = Rectangle((max(int(x - dx / 2 * grid_w), 0),
+                                            max(int(y - dy / 2 * grid_h), 0)),
+                                           int(dx * grid_w),
+                                           int(dy * grid_h),
+                                           linewidth=3,
+                                           edgecolor=colors[idx],
+                                           facecolor='none')
+                    ax.add_patch(bound_rect)
+            ax.add_patch(rect)
+
+    return ax
+
+# if __name__ == "__main__":
+#     cls_test = ['bicycle', 'bus', 'car', 'motorbike']
+#     ds = VOCDetectionCustom(classes=cls_test)
+#     iter_ds = iter(ds)
+#     for i in range(10):
+#         img, data = next(iter_ds)
+#         show_tensors_data(img, data)
+#         plt.show()
