@@ -15,7 +15,7 @@ class TestVocDataset():
         img, target = next(iter_ds)
 
         assert (img.shape == (3, 448, 448) and
-                target.shape == (14, 14, 2, 27))
+                target.shape == (14, 14, 2, 25))
 
     def test_outputs_2(self,):
         cls_test = ['bicycle', 'bus', 'car', 'motorbike']
@@ -42,10 +42,8 @@ class TestVocDataset():
 
     def test_errors_1(self,):
         cls_test = ['xxx', 'bus', 'car', 'motorbike']
-        ds = VOCDetectionCustom(classes=cls_test)
-        iter_ds = iter(ds)
-        with pytest.raises(IndexError):
-            img, target = next(iter_ds)
+        with pytest.raises(FileNotFoundError):
+            ds = VOCDetectionCustom(classes=cls_test)
 
     def test_errors_2(self,):
         with pytest.raises(FileNotFoundError):
