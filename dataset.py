@@ -5,6 +5,7 @@ Classes for the Datasets
 import os
 import xml
 
+import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
@@ -18,13 +19,14 @@ class VOCDetectionCustom(Dataset):
     """
     YEAR = 'VOC2012'
     ANCHORS = ((10., 15.), (33., 23.))
-    CLASSES = ['person', 'bird', 'cat', 'cow', 'dog', 'horse',
-               'sheep', 'aeroplane', 'bicycle', 'boat', 'bus',
-               'car', 'motorbike', 'train', 'bottle', 'chair',
-               'diningtable', 'pottedplant', 'sofa', 'tvmonitor']
+    IMG_SIZE = (448, 448)
+    CLASSES = ['person', 'bird', 'cat', 'cow', 'dog', 'horse', 'sheep',
+               'aeroplane', 'bicycle', 'boat', 'bus', 'car', 'motorbike',
+               'train', 'bottle', 'chair', 'diningtable', 'pottedplant',
+               'sofa', 'tvmonitor']
 
-    def __init__(self, root_dir, i_transform=None, t_transform=None,
-                 classes='all', image_set='train'):
+    def __init__(self, root_dir="./data/pascal_voc/", i_transform=None,
+                 t_transform=None, classes='all', image_set='train'):
         """
         Args:
             root_dir: Root directory of the images.
@@ -41,14 +43,15 @@ class VOCDetectionCustom(Dataset):
         self.root_dir = root_dir
         self.image_set = image_set
         self.i_transform = (i_transform if i_transform is not None
-                            else self.default_i_transform)
+                            else T.Compose([T.Resize(self.IMG_SIZE),
+                                            T.ToTensor()]))
         self.t_transform = (t_transform if t_transform is not None
                             else self.default_t_transform)
         if classes == 'all':
             self.classes = self.CLASSES
         else:
             self.classes = classes
-            self.classes_id = {cls: i for i, cls in enumerate(classes)}
+        self.classes_id = {cls: i for i, cls in enumerate(self.classes)}
 
         # Load images
         self.images = self._get_images_list()
@@ -62,8 +65,8 @@ class VOCDetectionCustom(Dataset):
         # For each class
         images = []
         for c in self.classes:
-            file_path = os.path.join(main_dir, c + '_' + self.image_set +
-                                     '.txt')
+            file_path = os.path.join(main_dir,
+                                     c + '_' + self.image_set + '.txt')
             with open(file_path) as f:
                 files = f.readlines()
                 imgs = [line.split(' ')[0]
@@ -104,11 +107,11 @@ class VOCDetectionCustom(Dataset):
             if name in self.classes:
                 obj.append({'class': name,
                             'class_id': self.classes_id[name],
-                            'xmin': int(obj.find('bndbox').find('xmin').text),
-                            'ymin': int(obj.find('bndbox').find('ymin').text),
-                            'xmax': int(obj.find('bndbox').find('xmax').text),
-                            'ymax': int(obj.find('bndbox').find('ymax').text)})
-        target['objects'] = objects
+                            'xmin': int(o.find('bndbox').find('xmin').text),
+                            'ymin': int(o.find('bndbox').find('ymin').text),
+                            'xmax': int(o.find('bndbox').find('xmax').text),
+                            'ymax': int(o.find('bndbox').find('ymax').text)})
+        target['objects'] = obj
         # Transforms
         img = self.i_transform(img)
         target = self.t_transform(target)
@@ -118,22 +121,28 @@ class VOCDetectionCustom(Dataset):
 
     def _get_anchor_index(self, w, h):
         """
-        Get the anchor index with highest iou in heght and width
+        Get the anchor index with highest iou in height and width
         """
-        ious = []
-        for a in self.ANCHORS:
+        ious = np.zeros(len(self.ANCHORS))
+        for i, a in enumerate(self.ANCHORS):
             bb1 = [w, h]
-            bb2 = [a]
-            ious.append(self.wh_iou())
+            bb2 = a
+            ious[i] = self.wh_iou(bb1, bb2)
+        return ious.argmax()
 
     def wh_iou(self, bb1, bb2):
-        pass
+        w1, h1 = bb1[0], bb1[1]
+        w2, h2 = bb2[0], bb2[1]
 
-    def default_i_transform(self, img):
-        # TODO
-        pass
+        # Intersection area
+        inter = min(w1, w2) * min(h1, h2)
 
-    def default_t_transform(self, target, img_size=((448, 448)), stride=32):
+        # Union Area
+        union = (w1 * h1 + 1e-16) + w2 * h2 - inter
+
+        return inter / union
+
+    def default_t_transform(self, target, stride=32):
         """
         Transform the dictionary into the target volume.
 
@@ -155,7 +164,7 @@ class VOCDetectionCustom(Dataset):
         """
         img_w0, img_h0 = (int(target['image']['width']),
                           int(target['image']['heigth']))
-        img_w, img_h = img_size
+        img_w, img_h = self.IMG_SIZE
         # Ratio
         grid = img_w // stride
         n_classes = len(self.classes)
@@ -192,6 +201,9 @@ class VOCDetectionCustom(Dataset):
         return volume
 
 
-# Target transform
-GRID = 14
-IMG_SIZE = (448, 448)
+if __name__ == "__main__":
+    cls_test = ['bicycle', 'bus', 'car', 'motorbike']
+    ds = VOCDetectionCustom(classes=cls_test)
+    iter_ds = iter(ds)
+    img, data = next(iter_ds)
+    prin(32)
