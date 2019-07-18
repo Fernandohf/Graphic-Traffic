@@ -200,7 +200,7 @@ class VOCDetectionCustom(Dataset):
             volume[i_grid_x, i_grid_y, i_anchor, 4] = 1
             volume[i_grid_x, i_grid_y, i_anchor, 5:] = vol_cls
 
-        return volume
+        return torch.from_numpy(volume)
 
 
 def show_image(img, ax=None):
@@ -222,8 +222,8 @@ def show_image(img, ax=None):
 def show_tensors_data(img, target):
     img = T.ToPILImage()(img)
     img_data = np.array(img)
-
-    img_h, img_w = img.size
+    target = target.cpu().numpy()
+    img_h, img_w = img.sizebug
     grid = target.shape[0]
     anchors = target.shape[-2]
     grid_h, grid_w = (img_h // grid, img_w // grid)
