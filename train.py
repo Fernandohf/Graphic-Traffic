@@ -3,12 +3,15 @@ Trainer for the model.
 """
 import os
 
+import numpy as np
 import torch
 import torch.functional as F
 from torch import nn, optim
-from torch.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import DataLoader
 from tqdm import tqdm_notebook
 
+from dataset import VOCDetectionCustom
 from model import TinyYOLO, YoloV3Loss
 
 
@@ -18,14 +21,14 @@ class Trainer():
     """
 
     def __init__(self, train_dl, test_dl, model=TinyYOLO(),
-                 criterion=YoloV3Loss(), lr=0.001, lr_factor=.25
+                 criterion=YoloV3Loss(), lr=0.001, lr_factor=.25,
                  patience=3):
         self.train_dl = train_dl
         self.test_dl = test_dl
         self.model = model
         self.criterion = criterion
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
-        self.scheduler = ReduceLROnPlateau(optimizer,
+        self.scheduler = ReduceLROnPlateau(self.optimizer,
                                            'min',
                                            factor=lr_factor,
                                            patience=patience)
@@ -210,4 +213,17 @@ class Trainer():
 
 
 if __name__ == "__main__":
-    t = Trainer()
+    # Train Test Split
+    dataset = VOCDetectionCustom()
+    train_len = int(0.8 * len(dataset))
+    test_len = len(dataset) - train_len
+    train_ds, test_ds = torch.utils.data.random_split(dataset, [train_len,
+                                                                test_len])
+    train_dl = DataLoader(train_ds,
+                          batch_size=32,
+                          shuffle=True)
+
+    test_dl = DataLoader(test_ds,
+                         batch_size=32,
+                         shuffle=True)
+    t = Trainer(train_dl, test_dl)
