@@ -140,12 +140,12 @@ class Trainer():
         ######################
         # validate the model #
         ######################
-        # Initializa valid loss
+        # Initialize valid loss
         valid_loss = 0.0
         # Move to device
         self.model = self.model.to(self.device)
         total_valid = len(self.test_dl.dataset)
-        # Evalutions mode
+        # Evaluation mode
         self.model.eval()
         with torch.no_grad():
             for img, target in self.test_dl:
@@ -171,7 +171,7 @@ class Trainer():
             model: Model used.
             optimizer: Optimizer used.
             Scheduler: Scheduler used.
-            epoch: Epouch number.
+            epoch: Epoch number.
             losses: Dict with the losses.
             file_name: name of the saved file.
             directory: directory to save models.
