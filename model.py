@@ -24,7 +24,7 @@ class YoloLayer(nn.Module):
 
     Args:
         anchors: tuples of tuples of list of lists with the dimensions
-                 of the achors being used. Example:
+                 of the anchors being used. Example:
                  ((10., 13.), (33., 23.))
     """
 
@@ -35,7 +35,7 @@ class YoloLayer(nn.Module):
     def forward(self, x):
         out_xy = torch.sigmoid(x[..., 0:2])  # xy
         # wh for each anchor
-        out_wh = torch.stack([torch.exp(x[..., i, 2:4]) * torch.tensor(a)
+        out_wh = torch.stack([torch.exp(x[..., i, 2:4]) * torch.tensor(a).cuda()
                               for i, a in enumerate(self.anchors)],
                              dim=-2)
         out_obj = torch.sigmoid(x[..., 4:5])  # obj
@@ -54,7 +54,7 @@ class TinyYOLO(nn.Module):
         n_class: Number of possible classes.
     """
 
-    def __init__(self, anchors=((10., 13.), (33., 23.)), n_classes=3):
+    def __init__(self, anchors=((10., 13.), (33., 23.)), n_classes=4):
         super().__init__()
         self.n_anchors = len(anchors)
         self.n_classes = n_classes
@@ -119,7 +119,7 @@ class YoloV3Loss(nn.Module):
     - HW Loss: Mean squared error between the bounding
                height and width, multiplied by `lambda_coord`.
     - CLS Loss: Cross entropy loss between possible classes one
-                hot enconded, multiplied by `lambda_noobj`.
+                hot encoded, multiplied by `lambda_noobj`.
     """
 
     def __init__(self, lambda_coord=5, lambda_noobj=.5,):
@@ -139,24 +139,24 @@ class YoloV3Loss(nn.Module):
         # XY Loss
         xy_loss = (self.lambda_coord *
                    (self.MSE(pred[..., 0][obj_mask],
-                             target[..., 0][obj_mask]) +
+                             target[..., 0][obj_mask].float()) +
                     self.MSE(pred[..., 1][obj_mask],
-                             target[..., 1][obj_mask])))
+                             target[..., 1][obj_mask].float())))
         # HW Loss
         wh_loss = (self.lambda_coord *
                    (self.MSE(torch.sqrt(pred[..., 2][obj_mask]),
-                             torch.sqrt(target[..., 2][obj_mask])) +
+                             torch.sqrt(target[..., 2][obj_mask].float())) +
                     self.MSE(torch.sqrt(pred[..., 3][obj_mask]),
-                             torch.sqrt(target[..., 3][obj_mask]))))
+                             torch.sqrt(target[..., 3][obj_mask]).float())))
         # Class Loss
         cls_mask = target[..., 5:] == 1
         nocls_mask = ~cls_mask
         cls_loss = (self.MSE(pred[..., 5:][cls_mask],
-                             target[..., 5:][cls_mask]) +
+                             target[..., 5:][cls_mask].float()) +
                     self.lambda_noobj * self.MSE(pred[..., 5:][nocls_mask],
-                                                 target[..., 5:][nocls_mask]))
+                                                 target[..., 5:][nocls_mask].float()))
         # Object Loss
         obj_loss = self.MSE(pred[..., 4][obj_mask],
-                            target[..., 4][obj_mask])
+                            target[..., 4][obj_mask].float())
 
         return xy_loss + wh_loss + cls_loss + obj_loss
