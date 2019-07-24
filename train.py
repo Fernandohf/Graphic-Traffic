@@ -2,14 +2,14 @@
 Trainer for the model.
 """
 import os
-
+import datetime
 import numpy as np
 import torch
 import torch.functional as F
 from torch import nn, optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
-from tqdm import tqdm_notebook
+from tqdm import tqdm
 
 from dataset import VOCDetectionCustom
 from model import TinyYOLO, YoloV3Loss
@@ -36,7 +36,7 @@ class Trainer():
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.lr = lr
 
-    def train(self, n_epochs=1, batch_size=32, init_val_loss=np.Inf,
+    def train(self, n_epochs=1, init_val_loss=np.Inf,
               print_every=50, init_epoch=1):
         """
         Function to train the model
@@ -54,25 +54,21 @@ class Trainer():
         losses = {"train": [], "valid": []}
         valid_loss_min = init_val_loss
         # Progress bar
-        pbar_epochs = tqdm_notebook(
-            range(init_epoch, n_epochs + init_epoch),
-            total=n_epochs + init_epoch, ncols=900)
+        pbar_epochs = tqdm(range(init_epoch, n_epochs + init_epoch),
+                           total=n_epochs + init_epoch, ncols=200)
         for epoch in pbar_epochs:
             # keep track of training and validation loss
             train_loss = 0.0
             ###################
             # train the model #
             ###################
-            self.model.train().to(self.device)
+            self.model = self.model.train().to(self.device)
             total_train = len(self.train_dl.dataset)
-            pbar_train = tqdm_notebook(enumerate(self.train_dl, 1),
-                                       total=total_train // batch_size,
-                                       ncols=750)
-            for c, (img, target) in pbar_train:
+            for c, (img, target) in enumerate(self.train_dl, 1):
                 # Move tensors to GPU, if CUDA is available
                 img, target = img.to(self.device), target.to(self.device)
                 # Clear the gradients of all optimized variables
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 # Batch size
                 bs = img.size(0)
                 # forward pass
@@ -90,7 +86,7 @@ class Trainer():
                 # show partial results
                 if c % print_every == 0:
                     # print training statistics
-                    pbar_train.set_description(
+                    tqdm.write(
                         'Batch: {:3d}/{:3d} Training Loss: {:2.6f}'.format(
                             c,
                             len(self.train_dl),
@@ -98,7 +94,7 @@ class Trainer():
                         ))
 
             # Validate model
-            valid_loss = validate_model()
+            valid_loss = self.validate_model()
             losses["valid"].append(valid_loss)
             # calculate average losses
             train_loss = train_loss / total_train
@@ -112,16 +108,15 @@ class Trainer():
                 save_model = True
             # Save results
             improve = 'better' if save_model else 'worse'
-            save_checkpoint(model, optimizer, scheduler, epoch,
-                            losses, "Model_" + str(epoch) + improve + ".model")
+            self.save_checkpoint(epoch, losses, "Epoch_" + str(epoch) + improve)
 
             # print training/validation statistics
             output_str = ('Epoch: {:3d}/{:3d}' +
                           ' Training Loss: {:2.6f}' +
                           ' Validation Loss: {:2.6f}' +
                           ' Saving Model: {}')
-            pbar_epochs.set_description(output_str.format(
-                epoch, n_epochs, train_loss, valid_loss, save_model))
+            pbar_epochs.set_description(output_str.format(epoch, n_epochs, train_loss,
+                                                          valid_loss, save_model))
 
             # Scheduler step
             self.scheduler.step(valid_loss)
@@ -129,24 +124,18 @@ class Trainer():
         # Return losses
         self.losses = losses
 
-    # TODO - correct documentation
     def validate_model(self):
         """
         Validate the given model on test data.
-
-        Return:
-            loss: Validation loss
         """
         ######################
         # validate the model #
         ######################
         # Initialize valid loss
         valid_loss = 0.0
-        # Move to device
-        self.model = self.model.to(self.device)
         total_valid = len(self.test_dl.dataset)
         # Evaluation mode
-        self.model.eval()
+        self.model = self.model.eval().to(self.device)
         with torch.no_grad():
             for img, target in self.test_dl:
                 # move tensors to GPU if CUDA is available
@@ -162,8 +151,7 @@ class Trainer():
         valid_loss = valid_loss / total_valid
         return valid_loss
 
-    def save_checkpoint(self, model, optimizer, scheduler, epoch, losses,
-                        file_name, directory="model"):
+    def save_checkpoint(self, epoch, losses, file_name, directory="models"):
         """
         Saves the current model checkpoint
 
@@ -177,44 +165,52 @@ class Trainer():
             directory: directory to save models.
 
         """
+        # Append current datetime
+        file_name += '_{date:%Y-%m-%d_%H-%M-%S}.model'.format(date=datetime.datetime.now())
         directory_name = os.path.join(directory, file_name)
         # Saves the model
-        checkpoint = {"model_state_dict": model.state_dict(),
-                      "optim_state_dict": optimizer.state_dict(),
-                      "scheduler_state_dict": scheduler.state_dict(),
+        checkpoint = {"model_state_dict": self.model.state_dict(),
+                      "optim_state_dict": self.optimizer.state_dict(),
+                      "scheduler_state_dict": self.scheduler.state_dict(),
                       "epoch": epoch,
                       "train_loss": losses["train"],
                       "valid_loss": losses["valid"]}
         # Created directory
         torch.save(checkpoint, directory_name)
 
-    def load_checkpoint(self, model, optimizer, scheduler,
-                        losses, file_path, location='cpu'):
-        """
-        Load all info from last model.
 
-        Args:
-            model: Initialized Model.
-            optimizer: Initialized Optimizer.
-            Scheduler: Initialized Scheduler.
-            losses: Initialized Dict with the losses.
-            file_path: Relatice/full path to file.
-            location: Where to load the model.
-        """
-        # Loads the model
-        checkpoint = torch.load(file_path, map_location=location)
+def load_checkpoint(file_path, model, optimizer, scheduler, location='cpu'):
+    """
+    Load all info from last model.
 
-        # Load in given objects
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optim_state_dict"])
-        scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        losses["train"] = checkpoint["train_loss"]
-        losses["valid"] = checkpoint["valid_loss"]
+    Args:
+        file_path: Relatice/full path to file.
+        model: model to load weights from
+        optimizer: optimizer to load parameters from.
+        scheduler: to load from.
+        location: Where to load the model.
 
+    Return:
+        Dict with all the weight loaded
+    """
+    # Loads the model
+    checkpoint = torch.load(file_path, map_location=location)
+
+    # Load in given objects
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optim_state_dict"])
+    scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+    losses = {}
+    losses["train"] = checkpoint["train_loss"]
+    losses["valid"] = checkpoint["valid_loss"]
+
+    return {'model': model, 'optimizer': optimizer,
+            'scheduler': scheduler, 'losses': losses}
 
 if __name__ == "__main__":
     # Train Test Split
-    dataset = VOCDetectionCustom()
+    cls_test = ['bicycle', 'bus', 'car', 'motorbike']
+    dataset = VOCDetectionCustom(classes=cls_test)
     train_len = int(0.8 * len(dataset))
     test_len = len(dataset) - train_len
     train_ds, test_ds = torch.utils.data.random_split(dataset, [train_len,
@@ -226,4 +222,10 @@ if __name__ == "__main__":
     test_dl = DataLoader(test_ds,
                          batch_size=32,
                          shuffle=True)
-    t = Trainer(train_dl, test_dl)
+    # PARAMETERS
+    LR = 0.01
+    LR_FACTOR = .5
+    PATIENCE = 10
+    EPOCHS = 100
+    t = Trainer(train_dl, test_dl, lr=LR, lr_factor=LR_FACTOR, patience=PATIENCE)
+    t.train(n_epochs=EPOCHS, print_every=50, init_epoch=1)
