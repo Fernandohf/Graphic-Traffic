@@ -35,9 +35,10 @@ class YoloLayer(nn.Module):
     def forward(self, x):
         out_xy = torch.sigmoid(x[..., 0:2])  # xy
         # wh for each anchor
-        out_wh = torch.stack([torch.exp(x[..., i, 2:4]) * torch.tensor(a).cuda()
+        out_wh = torch.stack([torch.exp(x[..., i, 2:4]) * torch.tensor(a).to(x.device)
                               for i, a in enumerate(self.anchors)],
                              dim=-2)
+        # out_obj = torch.sigmoid(x[..., 4:5])  # obj
         out_obj = torch.sigmoid(x[..., 4:5])  # obj
         # out_cls = x[..., 5:]  # classes
         out_cls = torch.softmax(x[..., 5:], -1)  # classes
@@ -127,36 +128,33 @@ class YoloV3Loss(nn.Module):
         self.lambda_coord = lambda_coord
         self.lambda_noobj = lambda_noobj
         self.MSE = nn.MSELoss()
-        # self.BCE = nn.BCEWithLogitsLoss()
+        self.BCE = nn.BCELoss()
         # self.CE = nn.CrossEntropyLoss()
 
     def forward(self, pred, target):
         obj_mask = target[..., 4] == 1
         noobj_mask = ~obj_mask
+        pred = pred.float()
         if torch.sum(obj_mask) == 0:
             raise IndexError(
                 "Image has no class. Check the image or the target volume.")
         # XY Loss
         xy_loss = (self.lambda_coord *
-                   (self.MSE(pred[..., 0][obj_mask],
-                             target[..., 0][obj_mask].float()) +
-                    self.MSE(pred[..., 1][obj_mask],
-                             target[..., 1][obj_mask].float())))
+                   (self.MSE(pred[obj_mask][..., 0:2],
+                             target[obj_mask][..., 0:2].float())))
         # HW Loss
         wh_loss = (self.lambda_coord *
-                   (self.MSE(torch.sqrt(pred[..., 2][obj_mask]),
-                             torch.sqrt(target[..., 2][obj_mask].float())) +
-                    self.MSE(torch.sqrt(pred[..., 3][obj_mask]),
-                             torch.sqrt(target[..., 3][obj_mask]).float())))
+                   (self.MSE(torch.sqrt(pred[obj_mask][..., 2:4]),
+                             torch.sqrt(target[obj_mask][..., 2:4].float()))))
         # Class Loss
-        cls_mask = target[..., 5:] == 1
-        nocls_mask = ~cls_mask
-        cls_loss = (self.MSE(pred[..., 5:][cls_mask],
-                             target[..., 5:][cls_mask].float()) +
-                    self.lambda_noobj * self.MSE(pred[..., 5:][nocls_mask],
-                                                 target[..., 5:][nocls_mask].float()))
+        test = pred[obj_mask]
+        test2 = target[obj_mask]
+        cls_loss = (self.BCE(pred[obj_mask][..., 5:],
+                             target[obj_mask][..., 5:].float()))
         # Object Loss
-        obj_loss = self.MSE(pred[..., 4][obj_mask],
-                            target[..., 4][obj_mask].float())
+        obj_loss = (self.MSE(pred[obj_mask][..., 4],
+                             target[obj_mask][..., 4].float()) +
+                    self.lambda_noobj * self.MSE(pred[noobj_mask][..., 4],
+                                                 target[noobj_mask][..., 4].float()))
 
         return xy_loss + wh_loss + cls_loss + obj_loss
