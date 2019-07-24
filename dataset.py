@@ -219,11 +219,19 @@ def show_image(img, ax=None):
 
 
 # Check transforms
-def show_tensors_data(img, target):
+def show_tensors_data(img, target, thresh=.5):
+    """
+    Show the image with the network output or expected target.
+
+    Args:
+        img: input tensor image
+        target: target volume or network prediction.
+        thresh: threshold to filter bounding boxes
+    """
     img = T.ToPILImage()(img)
     img_data = np.array(img)
-    target = target.cpu().numpy()
-    img_h, img_w = img.sizebug
+    target = target.detach().cpu().numpy()
+    img_h, img_w = img.size
     grid = target.shape[0]
     anchors = target.shape[-2]
     grid_h, grid_w = (img_h // grid, img_w // grid)
@@ -237,7 +245,7 @@ def show_tensors_data(img, target):
             rect = Rectangle((rel_x, rel_y), grid_w, grid_h, linewidth=1,
                              edgecolor='b', facecolor='none')
             for k in range(anchors):
-                if target[i, j, k, 4] == 1:
+                if target[i, j, k, 4] > .5:
                     dx, dy = target[i, j, k, 2:4]
                     x, y = target[i, j, k, :2]
                     x, y = int(rel_x + x * grid_w), int(rel_y + y * grid_h)
@@ -254,11 +262,11 @@ def show_tensors_data(img, target):
 
     return ax
 
-# if __name__ == "__main__":
-#     cls_test = ['bicycle', 'bus', 'car', 'motorbike']
-#     ds = VOCDetectionCustom(classes=cls_test)
-#     iter_ds = iter(ds)
-#     for i in range(10):
-#         img, data = next(iter_ds)
-#         show_tensors_data(img, data)
-#         plt.show()
+if __name__ == "__main__":
+    cls_test = ['bicycle', 'bus', 'car', 'motorbike']
+    ds = VOCDetectionCustom(classes=cls_test)
+    iter_ds = iter(ds)
+    for i in range(10):
+        img, data = next(iter_ds)
+        show_tensors_data(img, data)
+        plt.show()
