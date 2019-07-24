@@ -3,7 +3,7 @@ Classes for the Datasets
 """
 
 import os
-import xml
+from xml.etree import ElementTree
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -96,7 +96,7 @@ class VOCDetectionCustom(Dataset):
                                    self.images[idx] + '.xml')
         img = Image.open(img_path).convert('RGB')
         # Get data as dict
-        xml_doc = xml.etree.ElementTree.parse(target_path)
+        xml_doc = ElementTree.parse(target_path)
         root = xml_doc.getroot()
         target = {}
         target['image'] = {'name': root.find('filename').text,
@@ -157,7 +157,7 @@ class VOCDetectionCustom(Dataset):
         [b_x, b_y, b_w, b_h, prob, one_hot_classes]
 
         Args:
-            target: dictionary with the bouding box info.
+            target: dictionary with the bounding box info.
             img_size: size of the input image.
             target: stride of the network.
 
