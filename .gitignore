@@ -2,5 +2,6 @@
 /data/cars_dataset/
 !/data/**/README.md
 **/.ipynb_checkpoints/
-/.vscode/
+.vscode/
 *pyc
+.vscode/settings.json
