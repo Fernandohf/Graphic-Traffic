@@ -126,3 +126,15 @@ class TestYoloLoss():
         out1 = crit(p1, t)
         out2 = crit(p2, t)
         assert (out1 > out2)
+
+    def test_outputs_4(self,):
+        p1 = torch.tensor([[[.5, .2, .5, 1.5, 1, 1, 0],
+                            [.1, .4, 2., 3., 1, 0, 1]]])
+        p2 = torch.tensor([[[.5, .2, .5, 1.5, 1, 0, 1],
+                            [.1, .4, 2., 3., 1, 1, 0]]])
+        t = torch.tensor([[[.5, .2, .5, 1.5, 1, 1, 0],
+                           [.1, .4, 2., 3., 1, 0, 1]]])
+        crit = YoloV3Loss()
+        out1 = crit(p1, t)
+        out2 = crit(p2, t)
+        assert (out1 < out2)
