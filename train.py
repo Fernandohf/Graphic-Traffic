@@ -223,9 +223,9 @@ if __name__ == "__main__":
                          batch_size=32,
                          shuffle=True)
     # PARAMETERS
-    LR = 0.01
+    LR = 0.001
     LR_FACTOR = .5
     PATIENCE = 10
-    EPOCHS = 100
+    EPOCHS = 600
     t = Trainer(train_dl, test_dl, lr=LR, lr_factor=LR_FACTOR, patience=PATIENCE)
     t.train(n_epochs=EPOCHS, print_every=50, init_epoch=1)
