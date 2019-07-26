@@ -95,9 +95,11 @@ class TinyYOLO(nn.Module):
         self.conv_7 = nn.Sequential(nn.BatchNorm2d(1024),
                                     nn.Conv2d(1024, 1024, 1),
                                     nn.LeakyReLU())
-        self.conv_8 = nn.Sequential(nn.Conv2d(512, 128, 1),
+        self.conv_8 = nn.Sequential(nn.BatchNorm2d(512),
+                                    nn.Conv2d(512, 128, 1),
                                     nn.LeakyReLU())
-        self.conv_9 = nn.Sequential(nn.Conv2d(128,
+        self.conv_9 = nn.Sequential(nn.BatchNorm2d(128),
+                                    nn.Conv2d(128,
                                               (5 + n_classes) * self.n_anchors,
                                               1),
                                     nn.LeakyReLU())

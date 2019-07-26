@@ -211,21 +211,21 @@ if __name__ == "__main__":
     # Train Test Split
     cls_test = ['bicycle', 'bus', 'car', 'motorbike']
     dataset = VOCDetectionCustom(classes=cls_test)
-    train_len = int(0.8 * len(dataset))
+    train_len = int(0.9 * len(dataset))
     test_len = len(dataset) - train_len
     train_ds, test_ds = torch.utils.data.random_split(dataset, [train_len,
                                                                 test_len])
     train_dl = DataLoader(train_ds,
-                          batch_size=32,
+                          batch_size=48,
                           shuffle=True)
 
     test_dl = DataLoader(test_ds,
-                         batch_size=32,
+                         batch_size=48,
                          shuffle=True)
     # PARAMETERS
-    LR = 0.001
-    LR_FACTOR = .5
-    PATIENCE = 10
+    LR = 0.0064
+    LR_FACTOR = .25
+    PATIENCE = 5
     EPOCHS = 600
     t = Trainer(train_dl, test_dl, lr=LR, lr_factor=LR_FACTOR, patience=PATIENCE)
     t.train(n_epochs=EPOCHS, print_every=50, init_epoch=1)
