@@ -66,28 +66,34 @@ class TinyYOLO(nn.Module):
                                     nn.Conv2d(16, 16, 3, padding=1),
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
-        self.conv_2 = nn.Sequential(nn.Conv2d(16, 32, 3, padding=1),  # 224x224
+        self.conv_2 = nn.Sequential(nn.BatchNorm2d(16),  # 224x224
+                                    nn.Conv2d(16, 32, 3, padding=1),
                                     nn.LeakyReLU(),
-                                    nn.Conv2d(32, 32, 3, padding=1),
+                                    nn.Conv2d(32, 64, 3, padding=1),
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
-        self.conv_3 = nn.Sequential(nn.Conv2d(32, 64, 3, padding=1),  # 112x112
-                                    nn.LeakyReLU(),
+        self.conv_3 = nn.Sequential(nn.BatchNorm2d(64),  # 112x112
                                     nn.Conv2d(64, 64, 3, padding=1),
                                     nn.LeakyReLU(),
-                                    nn.MaxPool2d(2, 2))
-        self.conv_4 = nn.Sequential(nn.Conv2d(64, 128, 3, padding=1),  # 56x56
+                                    nn.Conv2d(64, 128, 3, padding=1),
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
-        self.conv_5 = nn.Sequential(nn.Conv2d(128, 256, 3, padding=1),  # 28x28
+        self.conv_4 = nn.Sequential(nn.BatchNorm2d(128),
+                                    nn.Conv2d(128, 128, 3, padding=1),  # 56x56
+                                    nn.LeakyReLU(),
+                                    nn.MaxPool2d(2, 2))
+        self.conv_5 = nn.Sequential(nn.BatchNorm2d(128),
+                                    nn.Conv2d(128, 256, 3, padding=1),  # 28x28
                                     nn.LeakyReLU(),
                                     nn.Conv2d(256, 512, 3, padding=1),
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
         # 1D Convolutions
-        self.conv_6 = nn.Sequential(nn.Conv2d(512, 1024, 1),  # 14x14
+        self.conv_6 = nn.Sequential(nn.BatchNorm2d(512),
+                                    nn.Conv2d(512, 1024, 1),  # 14x14
                                     nn.LeakyReLU())
-        self.conv_7 = nn.Sequential(nn.Conv2d(1024, 512, 1),
+        self.conv_7 = nn.Sequential(nn.BatchNorm2d(1024),
+                                    nn.Conv2d(1024, 1024, 1),
                                     nn.LeakyReLU())
         self.conv_8 = nn.Sequential(nn.Conv2d(512, 128, 1),
                                     nn.LeakyReLU())
