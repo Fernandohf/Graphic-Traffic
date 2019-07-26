@@ -20,7 +20,7 @@ class VOCDetectionCustom(Dataset):
     and target ready for YOLO format.
     """
     YEAR = 'VOC2012'
-    ANCHORS = ((10., 15.), (33., 23.))
+    ANCHORS = ((4., 6.), (5., 5.))  # wxh
     IMG_SIZE = (448, 448)
     DEFAULT_PATH = ['VOCdevkit', 'VOC2012', 'ImageSets', 'Main']
     CLASSES = ['person', 'bird', 'cat', 'cow', 'dog', 'horse', 'sheep',
@@ -140,7 +140,7 @@ class VOCDetectionCustom(Dataset):
         inter = min(w1, w2) * min(h1, h2)
 
         # Union Area
-        union = (w1 * h1 + 1e-16) + w2 * h2 - inter
+        union = w1 * h1 + w2 * h2 - inter
 
         return inter / union
 
@@ -245,18 +245,22 @@ def show_tensors_data(img, target, thresh=.5):
             rect = Rectangle((rel_x, rel_y), grid_w, grid_h, linewidth=1,
                              edgecolor='b', facecolor='none')
             for k in range(anchors):
-                if target[i, j, k, 4] > .5:
+                if target[i, j, k, 4] > thresh:
                     dx, dy = target[i, j, k, 2:4]
                     x, y = target[i, j, k, :2]
                     x, y = int(rel_x + x * grid_w), int(rel_y + y * grid_h)
                     idx = target[i, j, k, 5:].argmax()
-                    bound_rect = Rectangle((max(int(x - dx / 2 * grid_w), 0),
-                                            max(int(y - dy / 2 * grid_h), 0)),
+                    rec_xy = (max(int(x - dx / 2 * grid_w), 0),
+                              max(int(y - dy / 2 * grid_h), 0))
+                    # Bounding box
+                    bound_rect = Rectangle(rec_xy,
                                            int(dx * grid_w),
                                            int(dy * grid_h),
                                            linewidth=3,
                                            edgecolor=colors[idx],
                                            facecolor='none')
+                    # Anchor name
+                    ax.text(*rec_xy, 'Anchor: ' + str(k), bbox=dict(edgecolor=colors[idx], facecolor='none', alpha=0.1))
                     ax.add_patch(bound_rect)
             ax.add_patch(rect)
 
