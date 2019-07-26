@@ -217,9 +217,9 @@ if __name__ == "__main__":
                                                                 test_len])
     # PARAMETERS
     LR = 0.0064
-    LR_FACTOR = .25
+    LR_FACTOR = .5
     PATIENCE = 5
-    EPOCHS = 200
+    EPOCHS = 400
     BATCH_SIZE = 32
     train_dl = DataLoader(train_ds,
                           batch_size=BATCH_SIZE,
