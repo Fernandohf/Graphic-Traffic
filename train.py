@@ -3,6 +3,7 @@ Trainer for the model.
 """
 import os
 import datetime
+import glob
 import numpy as np
 import torch
 import torch.functional as F
@@ -20,21 +21,16 @@ class Trainer():
     Trainer to train the model.
     """
 
-    def __init__(self, train_dl, test_dl, model=TinyYOLO(),
-                 criterion=YoloV3Loss(), lr=0.001, lr_factor=.25,
-                 patience=3):
+    def __init__(self, train_dl, test_dl, model, optimizer,
+                 scheduler, criterion=YoloV3Loss()):
         self.train_dl = train_dl
         self.test_dl = test_dl
         self.model = model
         self.criterion = criterion
-        self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
-        self.scheduler = ReduceLROnPlateau(self.optimizer,
-                                           'min',
-                                           factor=lr_factor,
-                                           patience=patience)
+        self.optimizer = optimizer
+        self.scheduler = scheduler
         # check if CUDA is available
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.lr = lr
 
     def train(self, n_epochs=1, init_val_loss=np.Inf,
               print_every=50, init_epoch=1):
@@ -108,7 +104,7 @@ class Trainer():
                 save_model = True
             # Save results
             improve = 'better' if save_model else 'worse'
-            self.save_checkpoint(epoch, losses, "Epoch_" + str(epoch) + improve)
+            self.save_checkpoint(epoch, losses, "Epoch_" + str(epoch) + '_' + improve)
 
             # print training/validation statistics
             output_str = ('Epoch: {:3d}/{:3d}' +
@@ -119,7 +115,7 @@ class Trainer():
                                                           valid_loss, save_model))
 
             # Scheduler step
-            self.scheduler.step(valid_loss)
+            self.scheduler.step(train_loss)
 
         # Return losses
         self.losses = losses
@@ -179,6 +175,20 @@ class Trainer():
         torch.save(checkpoint, directory_name)
 
 
+def find_best_model(path='models'):
+    """
+    Find the best model previously trained.
+    """
+    best = {'name': '', 'epoch': 0}
+    for model_name in glob.glob(path):
+        if 'better' in model_name:
+            epoch = int(model_name.split('_')[1])
+            if epoch > best['epoch']:
+                best['path'] = os.path.join(path, model_name)
+                best['epoch'] = epoch
+    return best
+
+
 def load_checkpoint(file_path, model, optimizer, scheduler, location='cpu'):
     """
     Load all info from last model.
@@ -204,8 +214,7 @@ def load_checkpoint(file_path, model, optimizer, scheduler, location='cpu'):
     losses["train"] = checkpoint["train_loss"]
     losses["valid"] = checkpoint["valid_loss"]
 
-    return {'model': model, 'optimizer': optimizer,
-            'scheduler': scheduler, 'losses': losses}
+    return (model, optimizer, scheduler, losses)
 
 if __name__ == "__main__":
     # Train Test Split
@@ -216,11 +225,13 @@ if __name__ == "__main__":
     train_ds, test_ds = torch.utils.data.random_split(dataset, [train_len,
                                                                 test_len])
     # PARAMETERS
-    LR = 0.0064
+    LR = 0.0128
     LR_FACTOR = .5
-    PATIENCE = 5
-    EPOCHS = 400
+    PATIENCE = 10
+    INIT_EPOCH = 0
+    EPOCHS = 100
     BATCH_SIZE = 32
+    CONTINUE = False
     train_dl = DataLoader(train_ds,
                           batch_size=BATCH_SIZE,
                           shuffle=True)
@@ -228,6 +239,16 @@ if __name__ == "__main__":
     test_dl = DataLoader(test_ds,
                          batch_size=BATCH_SIZE,
                          shuffle=True)
+    model = TinyYOLO(dataset.ANCHORS, len(dataset.classes))
+    optimizer = optim.Adam(model.parameters(), lr=LR)
+    scheduler = ReduceLROnPlateau(optimizer,
+                                  'min',
+                                  factor=LR_FACTOR,
+                                  patience=PATIENCE)
+    if CONTINUE:
+        best_model = find_best_model()
+        INIT_EPOCH = best_model['epoch']
+        model, optimizer, scheduler, losses = load_checkpoint(best_model['path'], model, optimizer, scheduler, 'cuda')
 
-    t = Trainer(train_dl, test_dl, lr=LR, lr_factor=LR_FACTOR, patience=PATIENCE)
-    t.train(n_epochs=EPOCHS, print_every=100, init_epoch=1)
+    t = Trainer(train_dl, test_dl, model, optimizer, scheduler)
+    t.train(n_epochs=EPOCHS, print_every=100, init_epoch=INIT_EPOCH)

@@ -130,8 +130,8 @@ class YoloV3Loss(nn.Module):
                            box centers, multiplied by `lambda_coord`.
     - HW Loss: Mean squared error between the bounding
                height and width, multiplied by `lambda_coord`.
-    - CLS Loss: Cross entropy loss between possible classes one
-                hot encoded, multiplied by `lambda_noobj`.
+    - CLS Loss: Binary cross entropy loss between possible classes one
+                hot encoded.
     """
 
     def __init__(self, lambda_coord=5, lambda_noobj=.5,):

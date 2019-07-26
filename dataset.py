@@ -237,12 +237,14 @@ def show_tensors_data(img, target, thresh=.5):
     grid_h, grid_w = (img_h // grid, img_w // grid)
     ax = show_image(img)
     colors = {0: 'r', 1: 'orange',
-              2: 'g', 3: 'k', }
+              2: 'g', 3: 'cyan', }
+    classes = {0: 'bicycle', 1: 'bus',
+               2: 'car', 3: 'motorbike'}
     for i in range(grid):
         for j in range(grid):
             rel_x = i * grid_w
             rel_y = j * grid_h
-            rect = Rectangle((rel_x, rel_y), grid_w, grid_h, linewidth=1,
+            rect = Rectangle((rel_x, rel_y), grid_w, grid_h, linewidth=.2,
                              edgecolor='b', facecolor='none')
             for k in range(anchors):
                 if target[i, j, k, 4] > thresh:
@@ -260,7 +262,9 @@ def show_tensors_data(img, target, thresh=.5):
                                            edgecolor=colors[idx],
                                            facecolor='none')
                     # Anchor name
-                    ax.text(*rec_xy, 'Anchor: ' + str(k), bbox=dict(edgecolor=colors[idx], facecolor='none', alpha=0.1))
+
+                    s = 'Anchor: ' + str(k) + ', Class: ' + str(classes[idx]) + ', Confidence: ' + str(round(target[i, j, k, 5 + idx], 1))
+                    ax.text(*rec_xy, s, bbox=dict(facecolor=colors[idx]))
                     ax.add_patch(bound_rect)
             ax.add_patch(rect)
 

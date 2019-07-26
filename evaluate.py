@@ -124,12 +124,13 @@ if __name__ == "__main__":
     test_dl = DataLoader(test_ds,
                          batch_size=32,
                          shuffle=True)
-    model = TinyYOLO()
+    model = TinyYOLO(dataset.ANCHORS, len(dataset.classes))
     criterion = YoloV3Loss()
     optimizer = optim.Adam(model.parameters())
     scheduler = ReduceLROnPlateau(optimizer,
                                   'min')
-    loaded_results = load_checkpoint('models/Epoch_200worse_2019-07-26_10-28-43.model', model, optimizer, scheduler, 'cuda')
+    loaded_results = load_checkpoint('models/Epoch_3better_2019-07-26_15-04-33.model', model, optimizer, scheduler, 'cuda')
+
     model = loaded_results['model'].cuda()
     img, target = next(train_dl.__iter__())
     show_tensors_data(img[0], target[0])
