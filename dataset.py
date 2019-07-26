@@ -22,6 +22,7 @@ class VOCDetectionCustom(Dataset):
     YEAR = 'VOC2012'
     ANCHORS = ((10., 15.), (33., 23.))
     IMG_SIZE = (448, 448)
+    DEFAULT_PATH = ['VOCdevkit', 'VOC2012', 'ImageSets', 'Main']
     CLASSES = ['person', 'bird', 'cat', 'cow', 'dog', 'horse', 'sheep',
                'aeroplane', 'bicycle', 'boat', 'bus', 'car', 'motorbike',
                'train', 'bottle', 'chair', 'diningtable', 'pottedplant',
@@ -62,8 +63,7 @@ class VOCDetectionCustom(Dataset):
         """
         List of images present in the classes used.
         """
-        main_path = ['VOCdevkit', 'VOC2012', 'ImageSets', 'Main']
-        main_dir = os.path.join(self.root_dir, *main_path)
+        main_dir = os.path.join(self.root_dir, *self.DEFAULT_PATH)
         # For each class
         images = []
         for c in self.classes:
