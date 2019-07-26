@@ -166,3 +166,6 @@ class YoloV3Loss(nn.Module):
                                                  target[noobj_mask][..., 4].float()))
 
         return xy_loss + wh_loss + cls_loss + obj_loss
+
+if __name__ == '__main__':
+    criteria = YoloV3Loss()
