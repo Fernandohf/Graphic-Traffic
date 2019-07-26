@@ -41,7 +41,8 @@ class YoloLayer(nn.Module):
         # out_obj = torch.sigmoid(x[..., 4:5])  # obj
         out_obj = torch.sigmoid(x[..., 4:5])  # obj
         # out_cls = x[..., 5:]  # classes
-        out_cls = torch.softmax(x[..., 5:], -1)  # classes
+        # out_cls = torch.softmax(x[..., 5:], -1)  # classes
+        out_cls = torch.sigmoid(x[..., 5:])  # classes
         return torch.cat([out_xy, out_wh, out_obj, out_cls], dim=-1)
 
 
@@ -80,21 +81,23 @@ class TinyYOLO(nn.Module):
                                     nn.MaxPool2d(2, 2))
         self.conv_5 = nn.Sequential(nn.Conv2d(128, 256, 3, padding=1),  # 28x28
                                     nn.LeakyReLU(),
-                                    nn.Conv2d(256, 256, 3, padding=1),
+                                    nn.Conv2d(256, 512, 3, padding=1),
                                     nn.LeakyReLU(),
                                     nn.MaxPool2d(2, 2))
         # 1D Convolutions
-        self.conv_6 = nn.Sequential(nn.Conv2d(256, 256, 1),  # 14x14
+        self.conv_6 = nn.Sequential(nn.Conv2d(512, 1024, 1),  # 14x14
                                     nn.LeakyReLU())
-        self.conv_7 = nn.Sequential(nn.Conv2d(256, 128, 1),
+        self.conv_7 = nn.Sequential(nn.Conv2d(1024, 512, 1),
                                     nn.LeakyReLU())
-        self.conv_8 = nn.Sequential(nn.Conv2d(128,
+        self.conv_8 = nn.Sequential(nn.Conv2d(512, 128, 1),
+                                    nn.LeakyReLU())
+        self.conv_9 = nn.Sequential(nn.Conv2d(128,
                                               (5 + n_classes) * self.n_anchors,
                                               1),
                                     nn.LeakyReLU())
         self.network = nn.Sequential(self.conv_1, self.conv_2, self.conv_3,
                                      self.conv_4, self.conv_5, self.conv_6,
-                                     self.conv_7, self.conv_8)
+                                     self.conv_7, self.conv_8, self.conv_9)
         self.yolo_layer = YoloLayer(anchors)
 
     def forward(self, x):
@@ -129,7 +132,6 @@ class YoloV3Loss(nn.Module):
         self.lambda_noobj = lambda_noobj
         self.MSE = nn.MSELoss()
         self.BCE = nn.BCELoss()
-        # self.CE = nn.CrossEntropyLoss()
 
     def forward(self, pred, target):
         obj_mask = target[..., 4] == 1
@@ -147,8 +149,6 @@ class YoloV3Loss(nn.Module):
                    (self.MSE(torch.sqrt(pred[obj_mask][..., 2:4]),
                              torch.sqrt(target[obj_mask][..., 2:4].float()))))
         # Class Loss
-        test = pred[obj_mask]
-        test2 = target[obj_mask]
         cls_loss = (self.BCE(pred[obj_mask][..., 5:],
                              target[obj_mask][..., 5:].float()))
         # Object Loss
