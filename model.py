@@ -3,7 +3,7 @@ Classes to build the model and its loss
 """
 import torch
 from torch import nn
-
+from dataset import VOCDetectionCustom
 # Model
 
 
@@ -52,11 +52,11 @@ class TinyYOLO(nn.Module):
     Network Stride: 32
 
     Args:
-        n_anchors: Number of anchors being used in the network.
+        anchors: Anchors being used in the network.
         n_class: Number of possible classes.
     """
 
-    def __init__(self, anchors=((10., 13.), (33., 23.)), n_classes=4):
+    def __init__(self, anchors, n_classes):
         super().__init__()
         self.n_anchors = len(anchors)
         self.n_classes = n_classes
@@ -92,11 +92,14 @@ class TinyYOLO(nn.Module):
         self.conv_6 = nn.Sequential(nn.BatchNorm2d(512),
                                     nn.Conv2d(512, 1024, 1),  # 14x14
                                     nn.LeakyReLU())
-        self.conv_7 = nn.Sequential(nn.Conv2d(1024, 512, 1),
+        self.conv_7 = nn.Sequential(nn.BatchNorm2d(1024),
+                                    nn.Conv2d(1024, 512, 1),
                                     nn.LeakyReLU())
-        self.conv_8 = nn.Sequential(nn.Conv2d(512, 128, 1),
+        self.conv_8 = nn.Sequential(nn.BatchNorm2d(512),
+                                    nn.Conv2d(512, 128, 1),
                                     nn.LeakyReLU())
-        self.conv_9 = nn.Sequential(nn.Conv2d(128,
+        self.conv_9 = nn.Sequential(nn.BatchNorm2d(128),
+                                    nn.Conv2d(128,
                                               (5 + n_classes) * self.n_anchors,
                                               1),
                                     nn.LeakyReLU())
@@ -112,7 +115,7 @@ class TinyYOLO(nn.Module):
         # Sequence of Conv2D + Maxpool
         x = self.network(x).float()
         # Reorder dimensions
-        x = x.permute(0, 2, 3, 1)
+        x = x.permute(0, 3, 2, 1)  # bs, w, h, c
         batch_size, i, j, _ = x.shape
         x = x.view(batch_size, i, j, self.n_anchors, -1)
         out = self.yolo_layer(x)
