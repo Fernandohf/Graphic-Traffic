@@ -22,15 +22,14 @@ class Trainer():
     """
 
     def __init__(self, train_dl, test_dl, model, optimizer,
-                 scheduler, criterion=YoloV3Loss()):
+                 scheduler, criterion=YoloV3Loss(), device='cuda'):
         self.train_dl = train_dl
         self.test_dl = test_dl
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
-        # check if CUDA is available
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = device
 
     def train(self, n_epochs=1, init_val_loss=np.Inf,
               print_every=50, init_epoch=1):
@@ -175,16 +174,16 @@ class Trainer():
         torch.save(checkpoint, directory_name)
 
 
-def find_best_model(path='models'):
+def find_best_model(path='models/*.model'):
     """
     Find the best model previously trained.
     """
-    best = {'name': '', 'epoch': 0}
+    best = {'path': '', 'epoch': -1}
     for model_name in glob.glob(path):
         if 'better' in model_name:
             epoch = int(model_name.split('_')[1])
             if epoch > best['epoch']:
-                best['path'] = os.path.join(path, model_name)
+                best['path'] = model_name
                 best['epoch'] = epoch
     return best
 
@@ -231,7 +230,7 @@ if __name__ == "__main__":
     INIT_EPOCH = 0
     EPOCHS = 100
     BATCH_SIZE = 32
-    CONTINUE = False
+    CONTINUE = True
     train_dl = DataLoader(train_ds,
                           batch_size=BATCH_SIZE,
                           shuffle=True)
@@ -239,7 +238,9 @@ if __name__ == "__main__":
     test_dl = DataLoader(test_ds,
                          batch_size=BATCH_SIZE,
                          shuffle=True)
-    model = TinyYOLO(dataset.ANCHORS, len(dataset.classes))
+    # check if CUDA is available
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = TinyYOLO(dataset.ANCHORS, len(dataset.classes)).to(device)
     optimizer = optim.Adam(model.parameters(), lr=LR)
     scheduler = ReduceLROnPlateau(optimizer,
                                   'min',
@@ -251,4 +252,4 @@ if __name__ == "__main__":
         model, optimizer, scheduler, losses = load_checkpoint(best_model['path'], model, optimizer, scheduler, 'cuda')
 
     t = Trainer(train_dl, test_dl, model, optimizer, scheduler)
-    t.train(n_epochs=EPOCHS, print_every=100, init_epoch=INIT_EPOCH)
+    t.train(n_epochs=EPOCHS, print_every=116, init_epoch=INIT_EPOCH)
