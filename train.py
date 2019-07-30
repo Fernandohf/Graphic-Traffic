@@ -32,7 +32,7 @@ class Trainer():
         self.device = device
 
     def train(self, n_epochs=1, init_val_loss=np.Inf,
-              print_every=50, init_epoch=1):
+              print_every=50, init_epoch=0):
         """
         Function to train the model
 
@@ -228,9 +228,9 @@ if __name__ == "__main__":
     LR_FACTOR = .5
     PATIENCE = 10
     INIT_EPOCH = 0
-    EPOCHS = 100
-    BATCH_SIZE = 32
-    CONTINUE = True
+    EPOCHS = 2
+    BATCH_SIZE = 4
+    CONTINUE = False
     train_dl = DataLoader(train_ds,
                           batch_size=BATCH_SIZE,
                           shuffle=True)

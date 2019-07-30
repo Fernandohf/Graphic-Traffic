@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from dataset import VOCDetectionCustom, show_tensors_data
 from model import TinyYOLO, YoloV3Loss
-from train import load_checkpoint
+from train import load_checkpoint, find_best_model
 
 
 class Evaluation():
@@ -54,61 +54,6 @@ class Evaluation():
         valid_loss = valid_loss / total_valid
         return valid_loss
 
-    def save_checkpoint(self, epoch, losses, file_name, directory="models"):
-        """
-        Saves the current model checkpoint
-
-        Args:
-            model: Model used.
-            optimizer: Optimizer used.
-            Scheduler: Scheduler used.
-            epoch: Epoch number.
-            losses: Dict with the losses.
-            file_name: name of the saved file.
-            directory: directory to save models.
-
-        """
-        # Append current datetime
-        file_name += '_{date:%Y-%m-%d_%H-%M-%S}.model'.format(date=datetime.datetime.now())
-        directory_name = os.path.join(directory, file_name)
-        # Saves the model
-        checkpoint = {"model_state_dict": self.model.state_dict(),
-                      "optim_state_dict": self.optimizer.state_dict(),
-                      "scheduler_state_dict": self.scheduler.state_dict(),
-                      "epoch": epoch,
-                      "train_loss": losses["train"],
-                      "valid_loss": losses["valid"]}
-        # Created directory
-        torch.save(checkpoint, directory_name)
-
-
-def load_checkpoint(file_path, model, optimizer, scheduler, location='cpu'):
-    """
-    Load all info from last model.
-
-    Args:
-        file_path: Relatice/full path to file.
-        model: model to load weights from
-        optimizer: optimizer to load parameters from.
-        scheduler: to load from.
-        location: Where to load the model.
-
-    Return:
-        Dict with all the weight loaded
-    """
-    # Loads the model
-    checkpoint = torch.load(file_path, map_location=location)
-
-    # Load in given objects
-    model.load_state_dict(checkpoint["model_state_dict"])
-    optimizer.load_state_dict(checkpoint["optim_state_dict"])
-    scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-    losses = {}
-    losses["train"] = checkpoint["train_loss"]
-    losses["valid"] = checkpoint["valid_loss"]
-
-    return {'model': model, 'optimizer': optimizer,
-            'scheduler': scheduler, 'losses': losses}
 
 if __name__ == "__main__":
     cls_test = ['bicycle', 'bus', 'car', 'motorbike']
@@ -129,12 +74,14 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters())
     scheduler = ReduceLROnPlateau(optimizer,
                                   'min')
-    loaded_results = load_checkpoint('models/Epoch_3better_2019-07-26_15-04-33.model', model, optimizer, scheduler, 'cuda')
-
-    model = loaded_results['model'].cuda()
+    best_model = find_best_model()
+    model, optimizer, scheduler, loss = load_checkpoint(best_model['path'], model, optimizer, scheduler, 'cuda')
+    # model, optimizer, scheduler, loss = load_checkpoint('models/Epoch_54_worse_2019-07-26_16-56-15.model', model, optimizer, scheduler, 'cuda')
+    model = model.cuda()
     img, target = next(train_dl.__iter__())
+    # img, target = next(test_dl.__iter__())
     show_tensors_data(img[0], target[0])
     plt.show()
     pred = model(img[0:1].cuda())
-    show_tensors_data(img[0], pred[0], thresh=.7)
+    show_tensors_data(img[0], pred[0], thresh=.8)
     plt.show()
