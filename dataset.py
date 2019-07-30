@@ -29,7 +29,7 @@ class VOCDetectionCustom(Dataset):
                'sofa', 'tvmonitor']
 
     def __init__(self, root_dir="./data/pascal_voc/", i_transform=None,
-                 t_transform=None, classes='all', image_set='train'):
+                 t_transform=None, classes='all', image_set='train', stride=64):
         """
         Args:
             root_dir: Root directory of the images.
@@ -58,6 +58,7 @@ class VOCDetectionCustom(Dataset):
 
         # Load images
         self.images = self._get_images_list()
+        self.stride = stride
 
     def _get_images_list(self,):
         """
@@ -144,7 +145,7 @@ class VOCDetectionCustom(Dataset):
 
         return inter / union
 
-    def default_t_transform(self, target, stride=32):
+    def default_t_transform(self, target):
         """
         Transform the dictionary into the target volume.
 
@@ -158,8 +159,6 @@ class VOCDetectionCustom(Dataset):
 
         Args:
             target: dictionary with the bounding box info.
-            img_size: size of the input image.
-            target: stride of the network.
 
         Returns:
             volume: Tranformed target.
@@ -168,7 +167,7 @@ class VOCDetectionCustom(Dataset):
                           int(target['image']['heigth']))
         img_w, img_h = self.IMG_SIZE
         # Ratio
-        grid = img_w // stride
+        grid = img_w // self.stride
         n_classes = len(self.classes)
         n_anchors = len(self.ANCHORS)
         w_ratio = img_w / img_w0
