@@ -29,7 +29,7 @@ class VOCDetectionCustom(Dataset):
                'sofa', 'tvmonitor']
 
     def __init__(self, root_dir="./data/pascal_voc/", i_transform=None,
-                 t_transform=None, classes='all', image_set='train', stride=64):
+                 t_transform=None, classes='all', image_set='train', stride=32):
         """
         Args:
             root_dir: Root directory of the images.
@@ -47,7 +47,9 @@ class VOCDetectionCustom(Dataset):
         self.image_set = image_set
         self.i_transform = (i_transform if i_transform is not None
                             else T.Compose([T.Resize(self.IMG_SIZE),
-                                            T.ToTensor()]))
+                                            T.ToTensor(),
+                                            T.Normalize(mean=[0.485, 0.456, 0.406],
+                                                        std=[0.229, 0.224, 0.225])]))
         self.t_transform = (t_transform if t_transform is not None
                             else self.default_t_transform)
         if classes == 'all':
@@ -227,7 +229,10 @@ def show_tensors_data(img, target, thresh=.5):
         target: target volume or network prediction.
         thresh: threshold to filter bounding boxes
     """
-    img = T.ToPILImage()(img)
+    inverse_transformations = T.Compose([T.Normalize(mean=[-0.485 / 0.229, 0.456 / 0.224, 0.406 / 0.225],
+                                                     std=[1 / 0.229, 1 / 0.224, 1 / 0.225]),
+                                         T.ToPILImage()])
+    img = inverse_transformations(img)
     img_data = np.array(img)
     target = target.detach().cpu().numpy()
     img_h, img_w = img.size

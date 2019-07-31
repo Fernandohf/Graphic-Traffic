@@ -219,17 +219,17 @@ if __name__ == "__main__":
     # Train Test Split
     cls_test = ['bicycle', 'bus', 'car', 'motorbike']
     dataset = VOCDetectionCustom(classes=cls_test)
-    train_len = int(0.9 * len(dataset))
+    train_len = int(0.8 * len(dataset))
     test_len = len(dataset) - train_len
     train_ds, test_ds = torch.utils.data.random_split(dataset, [train_len,
                                                                 test_len])
     # PARAMETERS
-    LR = 0.0128
-    LR_FACTOR = .5
-    PATIENCE = 10
+    LR = 0.0256
+    LR_FACTOR = .25
+    PATIENCE = 5
     INIT_EPOCH = 0
-    EPOCHS = 2
-    BATCH_SIZE = 4
+    EPOCHS = 180
+    BATCH_SIZE = 64
     CONTINUE = False
     train_dl = DataLoader(train_ds,
                           batch_size=BATCH_SIZE,
@@ -252,4 +252,4 @@ if __name__ == "__main__":
         model, optimizer, scheduler, losses = load_checkpoint(best_model['path'], model, optimizer, scheduler, 'cuda')
 
     t = Trainer(train_dl, test_dl, model, optimizer, scheduler)
-    t.train(n_epochs=EPOCHS, print_every=116, init_epoch=INIT_EPOCH)
+    t.train(n_epochs=EPOCHS, print_every=30, init_epoch=INIT_EPOCH)

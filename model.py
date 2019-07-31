@@ -4,10 +4,11 @@ Classes to build the model and its loss
 import torch
 from torch import nn
 from dataset import VOCDetectionCustom
+from torchvision.models import mobilenet_v2
 # Model
 
 
-# TODO
+# TODO - Try add depthwise convolution
 class ResBlock(nn.Module):
     """
     Residual block
@@ -65,11 +66,11 @@ class TinyYOLO(nn.Module):
         n_class: Number of possible classes.
     """
 
-    def __init__(self, anchors, n_classes):
+    def __init__(self, anchors, n_classes, use_mobilenet=True):
         super().__init__()
         self.n_anchors = len(anchors)
         self.n_classes = n_classes
-        # Sequence of Convolution + Maxpool Layers
+        # Removing Features
         self.conv_1 = nn.Sequential(nn.Conv2d(3, 16, 3, padding=1),  # 448x448
                                     nn.LeakyReLU(),
                                     nn.Conv2d(16, 32, 3, padding=1),
@@ -107,23 +108,33 @@ class TinyYOLO(nn.Module):
                                     nn.MaxPool2d(2, 2))
         # 1D Convolutions
         self.conv_7 = nn.Sequential(nn.BatchNorm2d(1024),
-                                    nn.Conv2d(1024, 2048, 1),  # 7x7
+                                    nn.Conv2d(1024, 1280, 1),  # 7x7
                                     nn.LeakyReLU())
-        self.conv_8 = nn.Sequential(nn.BatchNorm2d(2048),
-                                    nn.Conv2d(2048, 2048, 1),
+        self.conv_8 = nn.Sequential(nn.BatchNorm2d(1280),
+                                    nn.Conv2d(1280, 2048, 1),
                                     nn.LeakyReLU())
         self.conv_9 = nn.Sequential(nn.BatchNorm2d(2048),
-                                    nn.Conv2d(2048, 512, 1),
+                                    nn.Conv2d(2048, 2048, 1),
                                     nn.LeakyReLU())
-        self.conv_10 = nn.Sequential(nn.BatchNorm2d(512),
-                                     nn.Conv2d(512,
+        self.conv_10 = nn.Sequential(nn.BatchNorm2d(2048),
+                                     nn.Conv2d(2048,
                                                (5 + n_classes) * self.n_anchors,
                                                1),
-                                     nn.LeakyReLU())
-        self.network = nn.Sequential(self.conv_1, self.conv_2, self.conv_3,
-                                     self.conv_4, self.conv_5, self.conv_6,
-                                     self.conv_7, self.conv_8, self.conv_9,
-                                     self.conv_10)
+                                     nn.ReLU6())
+        if use_mobilenet:
+            self.mobilenet = mobilenet_v2(pretrained=True)
+            # Freeze features layer
+            for p in self.mobilenet.features.parameters():
+                p.requires_grad = False
+            self.features = nn.Sequential(self.mobilenet.features,
+                                          self.conv_8,
+                                          self.conv_9,
+                                          self.conv_10)
+        else:
+            self.features = nn.Sequential(self.conv_1, self.conv_2, self.conv_3,
+                                          self.conv_4, self.conv_5, self.conv_6,
+                                          self.conv_7, self.conv_8, self.conv_9,
+                                          self.conv_10)
         self.yolo_layer = YoloLayer(anchors)
 
     def forward(self, x):
@@ -131,7 +142,7 @@ class TinyYOLO(nn.Module):
         Forward pass in the network.
         """
         # Sequence of Conv2D + Maxpool
-        x = self.network(x).float()
+        x = self.features(x).float()
         # Reorder dimensions
         x = x.permute(0, 3, 2, 1)  # bs, w, h, c
         batch_size, i, j, _ = x.shape
