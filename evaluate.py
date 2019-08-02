@@ -50,9 +50,6 @@ class Evaluation():
             loss = self.criterion(pred, target)
             # Update average validation loss
             valid_loss += loss.item() * bs
-        # Valid loss
-        valid_loss = valid_loss / total_valid
-        return valid_loss
 
 
 if __name__ == "__main__":
