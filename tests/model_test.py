@@ -47,25 +47,27 @@ class TestTinyYolo():
     """
     Tests for TinyYolo Class
     """
-
+    stride = 64
     def test_outputs_1(self,):
-        model = TinyYOLO()
+        model = TinyYOLO(((4., 6.), (5., 5.)), 3)
         inp_shape = (1, 3, 448, 448)
         inp = torch.ones(inp_shape)
         out = model(inp)
-        assert ((inp_shape[0], inp_shape[2] // 32, inp_shape[3] // 32,
+        assert ((inp_shape[0], inp_shape[2] // self.stride,
+                 inp_shape[3] // self.stride,
                  model.n_anchors, 5 + model.n_classes) == out.shape)
 
     def test_outputs_2(self,):
-        model = TinyYOLO(((10., 13.), (33., 23.), (21,  11.)), 5)
+        model = TinyYOLO(((10., 13.), (33., 23.), (21, 11.)), 5)
         inp_shape = (1, 3, 448, 448)
         inp = torch.ones(inp_shape)
         out = model(inp)
-        assert ((inp_shape[0], inp_shape[2] // 32, inp_shape[3] // 32,
+        assert ((inp_shape[0], inp_shape[2] // self.stride,
+                 inp_shape[3] // self.stride,
                  model.n_anchors, 5 + model.n_classes) == out.shape)
 
     def test_outputs_3(self,):
-        model = TinyYOLO()
+        model = TinyYOLO(((4., 6.), (5., 5.)), 3)
         inp_shape = (1, 3, 448, 448)
         inp = torch.ones(inp_shape)
         out = model(inp)
@@ -73,7 +75,7 @@ class TestTinyYolo():
             out[..., 0].min().item() > 0)
 
     def test_outputs_4(self,):
-        model = TinyYOLO()
+        model = TinyYOLO(((4., 6.), (5., 5.)), 3)
         inp_shape = (1, 3, 448, 448)
         inp = torch.ones(inp_shape)
         out = model(inp)
@@ -81,7 +83,7 @@ class TestTinyYolo():
             out[..., 1].min().item() > 0)
 
     def test_outputs_5(self,):
-        model = TinyYOLO()
+        model = TinyYOLO(((4., 6.), (5., 5.)), 3)
         inp_shape = (1, 3, 448, 448)
         inp = torch.ones(inp_shape)
         out = model(inp)
