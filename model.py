@@ -4,7 +4,6 @@ Classes to build the model and its loss
 import torch
 from torch import nn
 from dataset import VOCDetectionCustom
-from torchvision.models import mobilenet_v2
 # Model
 
 
@@ -66,7 +65,7 @@ class TinyYOLO(nn.Module):
         n_class: Number of possible classes.
     """
 
-    def __init__(self, anchors, n_classes, use_mobilenet=True):
+    def __init__(self, anchors, n_classes):
         super().__init__()
         self.n_anchors = len(anchors)
         self.n_classes = n_classes
@@ -121,20 +120,10 @@ class TinyYOLO(nn.Module):
                                                (5 + n_classes) * self.n_anchors,
                                                1),
                                      nn.ReLU6())
-        if use_mobilenet:
-            self.mobilenet = mobilenet_v2(pretrained=True)
-            # Freeze features layer
-            for p in self.mobilenet.features.parameters():
-                p.requires_grad = False
-            self.features = nn.Sequential(self.mobilenet.features,
-                                          self.conv_8,
-                                          self.conv_9,
-                                          self.conv_10)
-        else:
-            self.features = nn.Sequential(self.conv_1, self.conv_2, self.conv_3,
-                                          self.conv_4, self.conv_5, self.conv_6,
-                                          self.conv_7, self.conv_8, self.conv_9,
-                                          self.conv_10)
+        self.features = nn.Sequential(self.conv_1, self.conv_2, self.conv_3,
+                                      self.conv_4, self.conv_5, self.conv_6,
+                                      self.conv_7, self.conv_8, self.conv_9,
+                                      self.conv_10)
         self.yolo_layer = YoloLayer(anchors)
 
     def forward(self, x):
@@ -185,16 +174,70 @@ class YoloV3Loss(nn.Module):
         wh_loss = (self.lambda_coord *
                    (self.MSE(torch.sqrt(pred[obj_mask][..., 2:4]),
                              torch.sqrt(target[obj_mask][..., 2:4].float()))))
+        # Object Loss
+        conf = pred[..., 4] * batch_iou(pred[..., 0:4], target[..., 0:4])
+        obj_loss = (self.MSE(conf[obj_mask],
+                             target[obj_mask][..., 4].float()) +
+                    self.lambda_noobj * self.MSE(conf[noobj_mask],
+                                                 target[noobj_mask][..., 4].float()))
         # Class Loss
         cls_loss = (self.BCE(pred[obj_mask][..., 5:],
                              target[obj_mask][..., 5:].float()))
-        # Object Loss
-        obj_loss = (self.MSE(pred[obj_mask][..., 4],
-                             target[obj_mask][..., 4].float()) +
-                    self.lambda_noobj * self.MSE(pred[noobj_mask][..., 4],
-                                                 target[noobj_mask][..., 4].float()))
 
-        return xy_loss + wh_loss + cls_loss + obj_loss
+        return xy_loss + wh_loss + obj_loss + cls_loss
+
+
+def convert_bbox_xy(bbx):
+    """
+    Convert a bounding box from x,y w, h representation to x0, y0, x1, y1.
+
+    Args:
+        bbx: bounding boxes batch with shape (BATCH, 4).
+
+    Return:
+        New bounding boxes with x0, y0, x1, y1 representation.
+
+    """
+
+    x0 = (bbx[..., 0] - bbx[..., 2] / 2)
+    x1 = bbx[..., 0] + bbx[..., 2] / 2
+    y0 = bbx[..., 1] - bbx[..., 3] / 2
+    y1 = bbx[..., 1] + bbx[..., 3] / 2
+
+    return torch.cat([x0, y0, x1, y1], dim=0).transpose_(1, 0)
+
+
+def batch_iou(batch_bb1, batch_bb2, epsilon=1e-16):
+    """
+    TODO
+    """
+    # Convert to xy representation
+    bb1_xy = convert_bbox_xy(batch_bb1)
+    bb2_xy = convert_bbox_xy(batch_bb2)
+
+    # Calculate the left/right intersection coords
+    x0_i = torch.max(bb1_xy[..., 0], bb2_xy[..., 0])
+    y0_i = torch.max(bb1_xy[..., 1], bb2_xy[..., 1])
+    x1_i = torch.min(bb1_xy[..., 2], bb2_xy[..., 2])
+    y1_i = torch.min(bb1_xy[..., 3], bb2_xy[..., 3])
+
+    inter_area = torch.abs((x1_i - x0_i) * (y1_i - y0_i))
+    union_area = (torch.abs((bb1_xy[..., 2] - bb1_xy[..., 0]) * (bb1_xy[..., 3] - bb1_xy[..., 1])) +
+                  torch.abs((bb2_xy[..., 2] - bb2_xy[..., 0]) * (bb2_xy[..., 3] - bb2_xy[..., 1])) -
+                  inter_area)
+    return inter_area / (union_area + epsilon)
+
 
 if __name__ == '__main__':
     criteria = YoloV3Loss()
+    ANCHORS = ((4., 6.), (5., 5.))  # wxh
+    model = TinyYOLO(ANCHORS, 3)
+    p = torch.tensor([[[.5, .2, 1, 2., 1, .9, .1],
+                       [.1, .4, 2, 3., 0, .5, .5]]])
+    t1 = torch.tensor([[[.5, .2, .5, 1.5, 1, 1, 0],
+                        [55, 25, 5, 25., 0, 0, 0]]])
+    t2 = torch.tensor([[[.5, .2, .5, 1.5, 1, 1, 0],
+                        [.1, .4, 2, 3., 0, 0, 0]]])
+    crit = YoloV3Loss()
+    out1 = crit(p, t1)
+    out2 = crit(p, t2)
