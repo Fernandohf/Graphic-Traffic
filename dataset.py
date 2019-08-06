@@ -229,8 +229,12 @@ def show_tensors_data(img, target, thresh=.5):
         target: target volume or network prediction.
         thresh: threshold to filter bounding boxes
     """
-    inverse_transformations = T.Compose([T.Normalize(mean=[-0.485 / 0.229, 0.456 / 0.224, 0.406 / 0.225],
-                                                     std=[1 / 0.229, 1 / 0.224, 1 / 0.225]),
+    inverse_transformations = T.Compose([T.Normalize(mean=[-0.485 / 0.229,
+                                                           -0.456 / 0.224,
+                                                           -0.406 / 0.225],
+                                                     std=[1 / 0.229,
+                                                          1 / 0.224,
+                                                          1 / 0.225]),
                                          T.ToPILImage()])
     img = inverse_transformations(img)
     img_data = np.array(img)
@@ -267,7 +271,9 @@ def show_tensors_data(img, target, thresh=.5):
                                            facecolor='none')
                     # Anchor name
 
-                    s = 'Anchor: ' + str(k) + ', Class: ' + str(classes[idx]) + ', Confidence: ' + str(round(target[i, j, k, 5 + idx], 1))
+                    s = ('Anchor: ' + str(k) + ', Class: ' +
+                         str(classes[idx]) + ', Confidence: ' +
+                         str(round(target[i, j, k, 5 + idx], 1)))
                     ax.text(*rec_xy, s, bbox=dict(facecolor=colors[idx]))
                     ax.add_patch(bound_rect)
             ax.add_patch(rect)
@@ -278,7 +284,7 @@ if __name__ == "__main__":
     cls_test = ['bicycle', 'bus', 'car', 'motorbike']
     ds = VOCDetectionCustom(classes=cls_test)
     iter_ds = iter(ds)
-    for i in range(10):
+    for i in range(5):
         img, data = next(iter_ds)
         show_tensors_data(img, data)
         plt.show()
