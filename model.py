@@ -221,7 +221,7 @@ def batch_iou(batch_bb1, batch_bb2, epsilon=1e-16):
     x1_i = torch.min(bb1_xy[..., 2], bb2_xy[..., 2])
     y1_i = torch.min(bb1_xy[..., 3], bb2_xy[..., 3])
 
-    inter_area = torch.abs((x1_i - x0_i) * (y1_i - y0_i))
+    inter_area = torch.max((x1_i - x0_i) * (y1_i - y0_i), torch.tensor(0.))
     union_area = (torch.abs((bb1_xy[..., 2] - bb1_xy[..., 0]) * (bb1_xy[..., 3] - bb1_xy[..., 1])) +
                   torch.abs((bb2_xy[..., 2] - bb2_xy[..., 0]) * (bb2_xy[..., 3] - bb2_xy[..., 1])) -
                   inter_area)
@@ -233,11 +233,10 @@ if __name__ == '__main__':
     ANCHORS = ((4., 6.), (5., 5.))  # wxh
     model = TinyYOLO(ANCHORS, 3)
     p = torch.tensor([[[.5, .2, 1, 2., 1, .9, .1],
-                       [.1, .4, 2, 3., 0, .5, .5]]])
+                       [3, 3, 2, 2., 1, .5, .5],
+                       [3, 3, 2, 2., 0, .5, .5]]])
     t1 = torch.tensor([[[.5, .2, .5, 1.5, 1, 1, 0],
-                        [55, 25, 5, 25., 0, 0, 0]]])
-    t2 = torch.tensor([[[.5, .2, .5, 1.5, 1, 1, 0],
-                        [.1, .4, 2, 3., 0, 0, 0]]])
+                        [1, 4, 1, 2., 1, .5, .5],
+                        [3, 3, 2, 2., 0, .5, .5]]])
     crit = YoloV3Loss()
     out1 = crit(p, t1)
-    out2 = crit(p, t2)
