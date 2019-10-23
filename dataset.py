@@ -29,7 +29,7 @@ class VOCDetectionCustom(Dataset):
                'sofa', 'tvmonitor']
 
     def __init__(self, root_dir="./data/pascal_voc/", i_transform=None,
-                 t_transform=None, classes='all', image_set='train', stride=32):
+                 t_transform=None, classes='all', image_set='train', stride=64):
         """
         Args:
             root_dir: Root directory of the images.
@@ -279,6 +279,7 @@ def show_tensors_data(img, target, thresh=.5):
             ax.add_patch(rect)
 
     return ax
+
 
 if __name__ == "__main__":
     cls_test = ['bicycle', 'bus', 'car', 'motorbike']
