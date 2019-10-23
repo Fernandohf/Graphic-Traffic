@@ -198,13 +198,15 @@ def convert_bbox_xy(bbx):
         New bounding boxes with x0, y0, x1, y1 representation.
 
     """
-
+    shape = bbx.shape
     x0 = (bbx[..., 0] - bbx[..., 2] / 2)
-    x1 = bbx[..., 0] + bbx[..., 2] / 2
-    y0 = bbx[..., 1] - bbx[..., 3] / 2
-    y1 = bbx[..., 1] + bbx[..., 3] / 2
+    x1 = (bbx[..., 0] + bbx[..., 2] / 2)
+    y0 = (bbx[..., 1] - bbx[..., 3] / 2)
+    y1 = (bbx[..., 1] + bbx[..., 3] / 2)
 
-    return torch.cat([x0, y0, x1, y1], dim=0).transpose_(1, 0)
+    combined = torch.stack([x0, y0, x1, y1], dim=-2).transpose_(-1, -2)
+
+    return combined.float()
 
 
 def batch_iou(batch_bb1, batch_bb2, epsilon=1e-16):
@@ -212,8 +214,8 @@ def batch_iou(batch_bb1, batch_bb2, epsilon=1e-16):
     TODO
     """
     # Convert to xy representation
-    bb1_xy = convert_bbox_xy(batch_bb1)
-    bb2_xy = convert_bbox_xy(batch_bb2)
+    bb1_xy = convert_bbox_xy(batch_bb1.float())
+    bb2_xy = convert_bbox_xy(batch_bb2.float())
 
     # Calculate the left/right intersection coords
     x0_i = torch.max(bb1_xy[..., 0], bb2_xy[..., 0])
@@ -221,7 +223,7 @@ def batch_iou(batch_bb1, batch_bb2, epsilon=1e-16):
     x1_i = torch.min(bb1_xy[..., 2], bb2_xy[..., 2])
     y1_i = torch.min(bb1_xy[..., 3], bb2_xy[..., 3])
 
-    inter_area = torch.max((x1_i - x0_i) * (y1_i - y0_i), torch.tensor(0.))
+    inter_area = torch.max((x1_i - x0_i) * (y1_i - y0_i), torch.tensor(0.).to(x0_i.device))
     union_area = (torch.abs((bb1_xy[..., 2] - bb1_xy[..., 0]) * (bb1_xy[..., 3] - bb1_xy[..., 1])) +
                   torch.abs((bb2_xy[..., 2] - bb2_xy[..., 0]) * (bb2_xy[..., 3] - bb2_xy[..., 1])) -
                   inter_area)

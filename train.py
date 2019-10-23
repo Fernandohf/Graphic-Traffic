@@ -12,7 +12,6 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from dataset import VOCDetectionCustom
 from model import TinyYOLO, YoloV3Loss
 
 
@@ -185,6 +184,7 @@ def find_best_model(path='models/*.model'):
             if epoch > best['epoch']:
                 best['path'] = model_name
                 best['epoch'] = epoch
+    print(f"Best model found: {best['path']}")
     return best
 
 
@@ -225,11 +225,11 @@ if __name__ == "__main__":
                                                                 test_len])
     # PARAMETERS
     LR = 0.0256
-    LR_FACTOR = .25
+    LR_FACTOR = .5
     PATIENCE = 5
     INIT_EPOCH = 0
     EPOCHS = 180
-    BATCH_SIZE = 64
+    BATCH_SIZE = 16
     CONTINUE = False
     train_dl = DataLoader(train_ds,
                           batch_size=BATCH_SIZE,

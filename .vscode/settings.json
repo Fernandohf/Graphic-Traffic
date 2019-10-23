@@ -1,6 +1,6 @@
 {
     "python.linting.pylintEnabled": false,
-    "python.linting.pep8Enabled": true,
+    "python.linting.pycodestyleEnabled": true,
     "python.linting.enabled": true,
     "python.linting.flake8Enabled": false,
     "python.pythonPath": "D:\\Miniconda\\python.exe"

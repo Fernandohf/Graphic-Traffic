@@ -41,6 +41,7 @@ class BoundingBox():
         self.y = y
         self.heigh = heigh
         self.width = width
+
     def iou(self, box):
         """
         Return the Intersection over union between the boxes.
@@ -73,6 +74,7 @@ class YoloV3Loss(nn.Module):
                                                 target[..., 4])  # obj loss
 
         return xy_loss + wh_loss + cls_loss + obj_loss
+
 
 # Model
 class YoloLayer(nn.Module):
@@ -114,7 +116,7 @@ class TinyYOLO(nn.Module):
                                 nn.MaxPool2d(2, 2))
         self.C3 = nn.Sequential(nn.Conv2d(32, 64, 3, padding=1),  # sees 112x112x32 tensor
                                 nn.LeakyReLU(),
-                                nn.Conv2d(64,64, 3, padding=1),  # sees 112x112x32 tensor
+                                nn.Conv2d(64, 64, 3, padding=1),  # sees 112x112x32 tensor
                                 nn.LeakyReLU(),
                                 nn.MaxPool2d(2, 2))
         self.C4 = nn.Sequential(nn.Conv2d(64, 128, 3, padding=1),  # sees 56x56x64 tensor
@@ -133,7 +135,7 @@ class TinyYOLO(nn.Module):
                                 nn.LeakyReLU())
 
         self.network = nn.Sequential(self.C1, self.C2, self.C3, self.C4,
-                                      self.C5, self.C7, self.C8)
+                                     self.C5, self.C7, self.C8)
         self.yolo_layer = YoloLayer()
 
     def forward(self, x):
