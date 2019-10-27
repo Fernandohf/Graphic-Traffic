@@ -3,6 +3,10 @@
 
 Program to monitor traffic from camera input.
 
+## Features
+- Count cars passing (TODO)
+- Classify cars by model type (TODO)
+
 ## Dependencies
 Package | Version
 :---|:---:
@@ -23,6 +27,8 @@ TODO:
   -**Classes**: Bycicle, Car, Motorbike.
 - [COCO Detection 2014](http://cocodataset.org/#download)
   -**Classes**: Bycicle, Car, Motorcycle, Bus, Truck.
+- [Car Dataset](https://ai.stanford.edu/~jkrause/cars/car_dataset.html)
+    - **Classe**: Cars models
 
 ## Usage
 
